@@ -6,6 +6,7 @@ mod diffie_hellman;
 mod elliptic_curve;
 pub mod mod_ring;
 mod named_curves;
+mod named_fields;
 mod signature;
 
 pub use self::{
