@@ -3,7 +3,8 @@
 use {
     super::{
         mod_ring::{ModRing, ModRingElementRef, RingRefExt, UintExp, UintMont},
-        CryptoCoreRng, DiffieHellman,
+        mul_group::MulGroup,
+        CryptoCoreRng, CryptoGroup,
     },
     anyhow::{ensure, Result},
     subtle::ConditionallySelectable,
@@ -37,55 +38,70 @@ where
         })
     }
 
-    pub fn base_field(&self) -> &ModRing<U> {
+    #[inline]
+    #[must_use]
+    pub const fn base_field(&self) -> &ModRing<U> {
         &self.base_field
     }
 
-    pub fn scalar_field(&self) -> &ModRing<V> {
+    #[inline]
+    #[must_use]
+    pub const fn scalar_field(&self) -> &ModRing<V> {
         &self.scalar_field
     }
 
+    #[inline]
+    #[must_use]
     pub fn generator(&self) -> ModRingElementRef<'_, U> {
         self.base_field.from_montgomery(self.generator_monty)
     }
 }
 
-// pub fn generate_private_key(&self, mut rng: impl CryptoRng + RngCore) -> Uint
-// {     if let Some(bits) = self.private_value_length {
-//         let mut value = rng.gen::<Uint>();
-//         for b in bits..Uint::BITS {
-//             value.set_bit(b, false);
-//         }
-//         value.set_bit(bits - 1, true);
-//         assert!(value >= Uint::from(2).pow(Uint::from(bits - 1)));
-//         assert!(value < Uint::from(2).pow(Uint::from(bits)));
-//         value
-//     } else {
-//         self.base_field.random_pkcs_3(rng).as_montgomery()
-//     }
-// }
-
-// pub fn private_to_public_key(&self, private_key: Uint) ->
-// PrimeFieldElement<'_> {     self.generator().pow_ct(private_key)
-// }
-
-impl<U, V> DiffieHellman for ModPGroup<U, V>
+impl<'s, U, V> CryptoGroup<'s> for ModPGroup<U, V>
 where
-    U: UintMont + ConditionallySelectable,
-    V: UintMont + UintExp,
+    U: 's + UintMont + ConditionallySelectable,
+    V: 's + UintMont + UintExp,
 {
-    /// Generate private key according to PKCS #3.
-    /// Generate a value 2^(bits - 1) < 2^bits
-    /// TODO: X9.42 (repro in RFC 2631) require [2, (q - 2)]
-    fn generate_private_key(&self, rng: &mut dyn CryptoCoreRng) -> Vec<u8> {
-        todo!()
+    type BaseElement = MulGroup<ModRingElementRef<'s, U>>;
+    type ScalarElement = ModRingElementRef<'s, V>;
+
+    fn generator(&'s self) -> Self::BaseElement {
+        self.generator().into()
     }
 
-    fn private_to_public(&self, private: &[u8]) -> Result<Vec<u8>> {
-        todo!()
+    fn random_scalar(&'s self, rng: &mut dyn CryptoCoreRng) -> Self::ScalarElement {
+        self.scalar_field().random(rng)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use {
+        super::*,
+        crate::crypto::{
+            named_fields::{GROUP_1, GROUP_2, GROUP_3},
+            test_dh, test_schnorr,
+        },
+    };
+
+    #[test]
+    fn test_group_1() {
+        let group = ModPGroup::from(GROUP_1);
+        test_dh(&group);
+        test_schnorr(&group);
     }
 
-    fn shared_secret(&self, private: &[u8], public: &[u8]) -> Result<Vec<u8>> {
-        todo!()
+    #[test]
+    fn test_group_2() {
+        let group = ModPGroup::from(GROUP_2);
+        test_dh(&group);
+        test_schnorr(&group);
+    }
+
+    #[test]
+    fn test_group_3() {
+        let group = ModPGroup::from(GROUP_3);
+        test_dh(&group);
+        test_schnorr(&group);
     }
 }

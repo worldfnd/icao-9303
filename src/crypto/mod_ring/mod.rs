@@ -1,3 +1,5 @@
+//! Ring of integers modulo an odd number.
+
 mod element;
 mod mod_ring;
 mod ring_ref;

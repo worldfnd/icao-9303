@@ -43,10 +43,8 @@ impl<Ring: RingRef> RingRefExt for Ring {
 
     fn from<T: Into<Self::Uint>>(self, value: T) -> ModRingElement<Self> {
         let value = value.into();
-        dbg!(value);
         assert!(value < self.modulus());
         let value = self.mont_mul(value, self.montgomery_r2());
-        dbg!(value);
         self.from_montgomery(value)
     }
 

@@ -1,11 +1,10 @@
 use {
     num_traits::{PrimInt, Unsigned},
-    std::{fmt::Debug, marker::Sized},
     subtle::{Choice, ConstantTimeEq},
 };
 
 /// Trait for Uint backends that can be used for exponentiation.
-pub trait UintExp: Sized {
+pub trait UintExp {
     /// Returns an upper bound for the highest bit set.
     /// Ideally this should not depend on the value.
     fn bit_len(&self) -> usize;
@@ -14,9 +13,10 @@ pub trait UintExp: Sized {
     fn bit_ct(&self, index: usize) -> Choice;
 }
 
+// Implementation that should work for most unsigned integers.
 impl<T> UintExp for T
 where
-    T: PrimInt + Unsigned + ConstantTimeEq + Debug,
+    T: PrimInt + Unsigned + ConstantTimeEq,
 {
     fn bit_len(&self) -> usize {
         T::zero().count_zeros() as usize

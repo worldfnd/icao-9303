@@ -1,6 +1,6 @@
 use {
     super::{uint_exp::UintExp, ModRing, RingRef, RingRefExt, UintMont},
-    num_traits::One,
+    num_traits::{Inv, One, Pow, Zero},
     rand::{
         distributions::{Distribution, Standard},
         Rng,
@@ -8,7 +8,7 @@ use {
     std::{
         fmt::{self, Debug, Formatter},
         iter::{Product, Sum},
-        ops::{Add, AddAssign, Div, Mul, MulAssign, Neg, Sub, SubAssign},
+        ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign},
     },
     subtle::{Choice, ConditionallySelectable, ConstantTimeEq},
 };
@@ -24,23 +24,35 @@ pub struct ModRingElement<Ring: RingRef> {
 pub type ModRingElementRef<'a, Uint> = ModRingElement<&'a ModRing<Uint>>;
 
 impl<Ring: RingRef> ModRingElement<Ring> {
+    #[inline]
+    #[must_use]
     pub const fn from_montgomery(ring: Ring, value: Ring::Uint) -> Self {
         Self { ring, value }
     }
 
+    #[inline]
+    #[must_use]
     pub fn ring(&self) -> &ModRing<Ring::Uint> {
         &self.ring
     }
 
+    #[inline]
+    #[must_use]
     pub const fn as_montgomery(self) -> Ring::Uint {
         self.value
     }
 
+    // Note: We can not implement `From<Ring::Uint>` for `ModRingElement<Ring>`
+    // because this conflicts with `impl T From<T> for T` and we can't tell
+    // the compiler that `Ring` and `Ring::Uint` are not the same type.
+    #[inline]
+    #[must_use]
     pub fn to_uint(self) -> Ring::Uint {
         self.ring.mont_mul(self.value, Ring::Uint::one())
     }
 
-    #[inline(always)]
+    #[inline]
+    #[must_use]
     pub fn square(mut self) -> Self {
         self.value = self.ring.mont_square(self.value);
         self
@@ -50,7 +62,8 @@ impl<Ring: RingRef> ModRingElement<Ring> {
     ///
     /// Run time may depend on the exponent, use [`pow_ct`] if constant time or
     /// large exponents are required.
-    #[inline(always)]
+    #[inline]
+    #[must_use]
     pub fn pow(self, exponent: usize) -> Self {
         match exponent {
             0 => self.ring.one(),
@@ -59,14 +72,13 @@ impl<Ring: RingRef> ModRingElement<Ring> {
             n => self * self.pow(n / 2).square(),
         }
     }
+}
 
-    /// Inversion
-    ///
-    /// Run time may depend on the value.
-    pub fn inv(self) -> Option<Self> {
-        let value = self.value.inv_mod(self.ring.modulus())?;
-        let value = self.ring.mont_mul(value, self.ring.montgomery_r3());
-        Some(self.ring.from_montgomery(value))
+impl<Ring: RingRef + Default> ModRingElement<Ring> {
+    #[inline]
+    #[must_use]
+    pub fn from(value: Ring::Uint) -> Self {
+        Ring::default().from(value)
     }
 }
 
@@ -75,7 +87,8 @@ where
     Ring::Uint: ConditionallySelectable,
 {
     /// Constant-time exponentation with arbitrary unsigned int exponent.
-    pub fn pow_ct<U: UintExp + Debug>(self, exponent: U) -> Self {
+    #[must_use]
+    pub fn pow_ct<U: UintExp>(self, exponent: U) -> Self {
         let mut result = self.ring.one();
         let mut power = self;
         // We use `bit_len` here as an optimization when B >> log_2 exponent.
@@ -111,6 +124,34 @@ forward_fmt!(
     fmt::LowerHex,
     fmt::UpperHex
 );
+
+impl<Ring: RingRef + Default> Zero for ModRingElement<Ring> {
+    fn zero() -> Self {
+        Self::from_montgomery(Ring::default(), Ring::Uint::zero())
+    }
+
+    fn is_zero(&self) -> bool {
+        self.value.is_zero()
+    }
+
+    fn set_zero(&mut self) {
+        self.value.set_zero();
+    }
+}
+
+impl<Ring: RingRef + Default> One for ModRingElement<Ring> {
+    fn one() -> Self {
+        Self::from_montgomery(Ring::default(), Ring::Uint::zero())
+    }
+
+    fn is_one(&self) -> bool {
+        self.value == self.ring.montgomery_r()
+    }
+
+    fn set_one(&mut self) {
+        self.value = self.ring.montgomery_r()
+    }
+}
 
 impl<Ring: RingRef> Add for ModRingElement<Ring> {
     type Output = Self;
@@ -151,6 +192,16 @@ impl<Ring: RingRef> Neg for ModRingElement<Ring> {
     }
 }
 
+impl<Ring: RingRef> Inv for ModRingElement<Ring> {
+    type Output = Option<Self>;
+
+    fn inv(self) -> Self::Output {
+        let value = self.value.inv_mod(self.ring.modulus())?;
+        let value = self.ring.mont_mul(value, self.ring.montgomery_r3());
+        Some(self.ring.from_montgomery(value))
+    }
+}
+
 impl<Ring: RingRef> Div for ModRingElement<Ring> {
     type Output = Option<Self>;
 
@@ -185,6 +236,12 @@ impl<Ring: RingRef> MulAssign for ModRingElement<Ring> {
     fn mul_assign(&mut self, other: Self) {
         assert_eq!(self.ring(), other.ring());
         self.value = self.ring.mont_mul(self.value, other.value);
+    }
+}
+
+impl<Ring: RingRef> DivAssign for ModRingElement<Ring> {
+    fn div_assign(&mut self, rhs: Self) {
+        *self = self.div(rhs).expect("Division by non-invertible");
     }
 }
 
@@ -226,5 +283,31 @@ where
     fn ct_eq(&self, other: &Self) -> Choice {
         assert_eq!(self.ring(), other.ring());
         self.value.ct_eq(&other.value)
+    }
+}
+
+impl<Ring: RingRef, U: UintExp> Pow<U> for ModRingElement<Ring>
+where
+    Ring::Uint: ConditionallySelectable,
+{
+    type Output = Self;
+
+    fn pow(self, rhs: U) -> Self::Output {
+        self.pow_ct(rhs)
+    }
+}
+
+// Mixed ring power operations.
+// Realy only useful if RingB is a subgroup of the multiplicative group of
+// RingA.
+impl<RingA: RingRef, RingB: RingRef> Pow<ModRingElement<RingB>> for ModRingElement<RingA>
+where
+    RingA::Uint: ConditionallySelectable,
+    RingB::Uint: UintExp,
+{
+    type Output = Self;
+
+    fn pow(self, rhs: ModRingElement<RingB>) -> Self::Output {
+        self.pow_ct(rhs.to_uint())
     }
 }

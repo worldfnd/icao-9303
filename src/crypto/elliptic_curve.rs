@@ -5,6 +5,7 @@ use {
     },
     crate::asn1::public_key::{EcParameters, FieldId, SubjectPublicKeyInfo},
     anyhow::{anyhow, bail, ensure, Result},
+    num_traits::Inv,
     rand::{CryptoRng, Rng, RngCore},
     std::{
         fmt::{self, Debug, Display, Formatter},
@@ -396,11 +397,11 @@ impl Add for EllipticCurvePoint<'_> {
                 if x1 == x2 {
                     if y1 == y2 {
                         // Point doubling
-                        let lambda = (self.curve.base_field.from(Uint::from(3)) * x1.pow(2)
+                        let lambda = (self.curve.base_field.from_u64(3) * x1.pow(2)
                             + self.curve.a())
-                            / (self.curve.base_field.from(Uint::from(2)) * y1);
+                            / (self.curve.base_field.from_u64(2) * y1);
                         let lambda = lambda.unwrap();
-                        let x3 = lambda.pow(2) - self.curve.base_field.from(Uint::from(2)) * x1;
+                        let x3 = lambda.pow(2) - self.curve.base_field.from_u64(2) * x1;
                         let y3 = lambda * (x1 - x3) - y1;
                         EllipticCurvePoint {
                             curve:       self.curve,
