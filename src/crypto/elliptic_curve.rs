@@ -21,20 +21,20 @@ pub type PrimeFieldElement<'a> = ModRingElementRef<'a, Uint>;
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct EllipticCurve {
-    base_field: PrimeField,
-    scalar_field: PrimeField,
+    base_field:      PrimeField,
+    scalar_field:    PrimeField,
     // Curve parameters in Montgomery form.
     // Ideally we would store as PrimeFieldElement, but that would require a reference
     // to the field which confuses the borrow checker.
-    a_monty: Uint,
-    b_monty: Uint,
-    cofactor: Uint,
+    a_monty:         Uint,
+    b_monty:         Uint,
+    cofactor:        Uint,
     generator_monty: (Uint, Uint),
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct EllipticCurvePoint<'a> {
-    curve: &'a EllipticCurve,
+    curve:       &'a EllipticCurve,
     coordinates: Coordinates<'a>,
 }
 
@@ -61,10 +61,10 @@ impl PrimeField {
 
     /// Implements TR-03111 section 3.1.3 OS2FE procedure.
     ///
-    /// Note that it does not have any requirement on the input length and requires
-    /// the reader to apply the modular reduction. Note that this violates the unique
-    /// encoding property of DER encoding, but we'll apply the robustness principle and
-    /// allow it.
+    /// Note that it does not have any requirement on the input length and
+    /// requires the reader to apply the modular reduction. Note that this
+    /// violates the unique encoding property of DER encoding, but we'll
+    /// apply the robustness principle and allow it.
     ///
     /// The matching encoding procedure, however, does specify an exact length.
     pub fn os2fe<T: AsRef<[u8]>>(&self, os: T) -> PrimeFieldElement {
@@ -118,9 +118,10 @@ impl EllipticCurve {
 
         // TR-03111 only specifies prime field curves.
         // The alternatives would be binary fields and other extension fields.
-        // The are some binary field elliptic curves, but they are considered deprecated.
-        // I am not aware of any extension field curves in use, other than for ZK-friendliness.
-        // ensure!(params.field_id.field_type == ID_PRIME_FIELD);
+        // The are some binary field elliptic curves, but they are considered
+        // deprecated. I am not aware of any extension field curves in use,
+        // other than for ZK-friendliness. ensure!(params.field_id.field_type ==
+        // ID_PRIME_FIELD);
 
         // Construct the base and scalar fields.
         let base_field = PrimeField::from_field_id(&params.field_id)?;
@@ -188,7 +189,7 @@ impl EllipticCurve {
 
     pub fn pt_infinity(&self) -> EllipticCurvePoint {
         EllipticCurvePoint {
-            curve: self,
+            curve:       self,
             coordinates: Coordinates::Infinity,
         }
     }
@@ -201,7 +202,7 @@ impl EllipticCurve {
         ensure!(y.field() == &self.base_field);
         self.ensure_valid((x, y))?;
         Ok(EllipticCurvePoint {
-            curve: self,
+            curve:       self,
             coordinates: Coordinates::Affine(x, y),
         })
     }
@@ -402,7 +403,7 @@ impl Add for EllipticCurvePoint<'_> {
                         let x3 = lambda.pow(2) - self.curve.base_field.from(Uint::from(2)) * x1;
                         let y3 = lambda * (x1 - x3) - y1;
                         EllipticCurvePoint {
-                            curve: self.curve,
+                            curve:       self.curve,
                             coordinates: Coordinates::Affine(x3, y3),
                         }
                     } else {
@@ -434,7 +435,7 @@ impl Neg for EllipticCurvePoint<'_> {
         match self.coordinates {
             Coordinates::Infinity => self,
             Coordinates::Affine(x, y) => EllipticCurvePoint {
-                curve: self.curve,
+                curve:       self.curve,
                 coordinates: Coordinates::Affine(x, -y),
             },
         }
@@ -492,7 +493,8 @@ impl<'a> MulAssign<PrimeFieldElement<'a>> for EllipticCurvePoint<'_> {
 
 /// Conditionally select an Elliptic Curve Point
 ///
-/// Note: Points must have identical representation (Infinity / Affine) for constant-time.
+/// Note: Points must have identical representation (Infinity / Affine) for
+/// constant-time.
 ///
 /// # Panics
 ///
@@ -524,7 +526,8 @@ impl<'a> ConditionallySelectable for EllipticCurvePoint<'a> {
 
 /// Constant time coordinate equality check.
 ///
-/// Warning: Only constant time in coordinates, not in Infinity / Affine cases distinction.
+/// Warning: Only constant time in coordinates, not in Infinity / Affine cases
+/// distinction.
 ///
 /// # Panics
 ///

@@ -2,17 +2,14 @@
 //!
 //! Primarily based on TR-03111.
 
-mod diffie_hellman;
 mod elliptic_curve;
 pub mod mod_ring;
+pub mod modp_group;
 mod named_curves;
 mod named_fields;
 mod signature;
 
-pub use self::{
-    diffie_hellman::ModPGroup,
-    elliptic_curve::{ecka, EllipticCurve, EllipticCurvePoint},
-};
+pub use self::elliptic_curve::{ecka, EllipticCurve, EllipticCurvePoint};
 use {
     crate::asn1::public_key::{ECAlgoParameters, PubkeyAlgorithmIdentifier, SubjectPublicKeyInfo},
     anyhow::{bail, ensure, Result},
@@ -37,6 +34,12 @@ pub struct PublicKey(Vec<u8>);
 /// Opaque wrapper for private keys.
 pub struct PrivateKey(Box<dyn Any>);
 
+pub trait DiffieHellman {
+    fn generate_private_key(&self, rng: &mut dyn CryptoCoreRng) -> Vec<u8>;
+    fn private_to_public(&self, private: &[u8]) -> Result<Vec<u8>>;
+    fn shared_secret(&self, private: &[u8], public: &[u8]) -> Result<Vec<u8>>;
+}
+
 /// Object safe trait for key agreement algorithms
 pub trait KeyAgreementAlgorithm: Display + Debug {
     fn subject_public_key(&self, pubkey: &SubjectPublicKeyInfo) -> Result<PublicKey>;
@@ -54,7 +57,7 @@ impl SubjectPublicKeyInfo {
     /// Returns the KeyAgreementAlgorithm and public key.
     pub fn to_algorithm_public_key(&self) -> Result<(Box<dyn KeyAgreementAlgorithm>, PublicKey)> {
         let algo: Box<dyn KeyAgreementAlgorithm> = match &self.algorithm {
-            PubkeyAlgorithmIdentifier::Dh(params) => Box::new(ModPGroup::from_parameters(params)?),
+            PubkeyAlgorithmIdentifier::Dh(params) => todo!(), /* Box::new(ModPGroup::from_parameters(params)?), */
             PubkeyAlgorithmIdentifier::Ec(ec) => match ec {
                 ECAlgoParameters::EcParameters(params) => {
                     Box::new(EllipticCurve::from_parameters(params)?)
