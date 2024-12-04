@@ -12,9 +12,11 @@ impl<const BITS: usize, const LIMBS: usize> UintMont for Uint<BITS, LIMBS> {
             .expect("Modulus not an odd positive integer.")
             .wrapping_neg()
             .to();
-        let montgomery_r = Self::from(2).pow_mod(Self::from(BITS), modulus);
+
+        // R = 2^BITS mod modulus.
+        let montgomery_r = Self::from(2).pow_mod(Self::from(Self::BITS), modulus);
         let montgomery_r2 = montgomery_r.mul_mod(montgomery_r, modulus);
-        let montgomery_r3 = montgomery_r2.mul_mod(montgomery_r, modulus);
+        let montgomery_r3 = montgomery_r2.square_redc(modulus, mod_inv);
         ModRing {
             modulus,
             mod_inv,
@@ -24,22 +26,33 @@ impl<const BITS: usize, const LIMBS: usize> UintMont for Uint<BITS, LIMBS> {
         }
     }
 
+    fn random<R: rand::Rng + ?Sized>(rng: &mut R, max: Self) -> Self {
+        rng.gen::<Self>() % max
+    }
+
+    #[inline]
     fn mul_redc(self, other: Self, modulus: Self, mod_inv: u64) -> Self {
         Uint::mul_redc(self, other, modulus, mod_inv)
     }
 
-    fn add_mod(self, other: Self, modulus: Self) -> Self {
-        Uint::add_mod(self, other, modulus)
+    #[inline]
+    fn square_redc(self, modulus: Self, mod_inv: u64) -> Self {
+        Uint::square_redc(self, modulus, mod_inv)
     }
 
+    #[inline]
+    fn add_mod(self, other: Self, modulus: Self) -> Self {
+        let (sum, carry) = self.overflowing_add(other);
+        let (reduced, borrow) = sum.overflowing_sub(modulus);
+        if carry || !borrow {
+            reduced
+        } else {
+            sum
+        }
+    }
+
+    #[inline]
     fn inv_mod(self, modulus: Self) -> Option<Self> {
         Uint::inv_mod(self, modulus)
     }
-}
-
-#[test]
-fn test_impl_uint_exp() {
-    use {super::UintExp, ruint::aliases::U256};
-    fn ok<T: UintExp>() {}
-    ok::<U256>();
 }

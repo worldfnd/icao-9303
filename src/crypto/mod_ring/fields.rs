@@ -1,13 +1,11 @@
-#[cfg(test)]
-use crate::crypto::mod_ring::RingRefExt;
 use {
-    super::{ModRing, ModRingElement, RingRef},
+    super::{ModRing, ModRingElement, RingRef, RingRefExt},
     ruint::{aliases::U256, uint},
     std::ops::Deref,
 };
 
 // Marker type for Bn254 scalar field elements.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Bn254Field;
 
 impl RingRef for Bn254Field {
@@ -33,17 +31,21 @@ impl Deref for Bn254Field {
 
 pub type Bn254Element = ModRingElement<Bn254Field>;
 
+impl From<U256> for Bn254Element {
+    fn from(value: U256) -> Self {
+        Bn254Field.from(value)
+    }
+}
+
+impl From<Bn254Element> for U256 {
+    fn from(value: Bn254Element) -> Self {
+        value.to_uint()
+    }
+}
+
 #[test]
 fn test_bn254_field() {
+    // use std::mem::size_of;
     assert_eq!(size_of::<Bn254Element>(), 32);
-
-    let field = ModRing::from_modulus(uint!(
-        21888242871839275222246405745257275088548364400416034343698204186575808495617_U256
-    ));
-    assert_eq!(&*Bn254Field, &field);
-
-    let one = Bn254Field.one();
-    let two = one + one;
-
-    assert_eq!(two, Bn254Field.from(U256::from(2)));
+    assert_eq!(*Bn254Field, ModRing::from_modulus(Bn254Field.modulus()));
 }

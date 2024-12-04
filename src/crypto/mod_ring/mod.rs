@@ -1,10 +1,15 @@
-mod fields;
+pub mod fields;
 mod ruint;
 
 use {
     num_traits::{One, PrimInt, Unsigned, Zero},
+    rand::{
+        distributions::{Distribution, Standard},
+        Rng,
+    },
     std::{
         fmt::{self, Debug, Formatter},
+        iter::{Product, Sum},
         ops::{Add, AddAssign, Deref, Div, Mul, MulAssign, Neg, Sub, SubAssign},
     },
     subtle::{Choice, ConditionallySelectable, ConstantTimeEq},
@@ -15,7 +20,9 @@ pub trait UintMont:
     Sized + Copy + PartialEq + Eq + PartialOrd + Debug + Zero + One + Sub<Output = Self>
 {
     fn parameters_from_modulus(modulus: Self) -> ModRing<Self>;
+    fn random<R: Rng + ?Sized>(rng: &mut R, max: Self) -> Self;
     fn mul_redc(self, other: Self, modulus: Self, mod_inv: u64) -> Self;
+    fn square_redc(self, modulus: Self, mod_inv: u64) -> Self;
     fn add_mod(self, other: Self, modulus: Self) -> Self;
     fn inv_mod(self, modulus: Self) -> Option<Self>;
 }
@@ -45,6 +52,7 @@ pub trait RingRefExt: RingRef {
     fn from<T: Into<Self::Uint>>(self, value: T) -> ModRingElement<Self>;
     fn zero(self) -> ModRingElement<Self>;
     fn one(self) -> ModRingElement<Self>;
+    fn random<R: Rng + ?Sized>(self, rng: &mut R) -> ModRingElement<Self>;
 }
 
 /// Ring of integers modulo an odd positive integer.
@@ -83,13 +91,35 @@ impl<Uint: UintMont> ModRing<Uint> {
         self.modulus
     }
 
+    pub fn montgomery_r(&self) -> Uint {
+        self.montgomery_r
+    }
+
+    pub fn montgomery_r2(&self) -> Uint {
+        self.montgomery_r2
+    }
+
+    pub fn montgomery_r3(&self) -> Uint {
+        self.montgomery_r3
+    }
+
+    pub fn mod_inv(&self) -> u64 {
+        self.mod_inv
+    }
+
     /// Montogomery multiplication for the ring.
     fn mont_mul(&self, a: Uint, b: Uint) -> Uint {
         a.mul_redc(b, self.modulus, self.mod_inv)
     }
+
+    /// Montgomery squaring for the ring.
+    fn mont_square(&self, a: Uint) -> Uint {
+        a.square_redc(self.modulus, self.mod_inv)
+    }
 }
 
 impl<Ring: RingRef> RingRefExt for Ring {
+    #[inline(always)]
     fn from_montgomery(self, value: Ring::Uint) -> ModRingElement<Self> {
         debug_assert!(value < self.modulus);
         ModRingElement { ring: self, value }
@@ -102,16 +132,26 @@ impl<Ring: RingRef> RingRefExt for Ring {
         self.from_montgomery(value)
     }
 
+    #[inline(always)]
     fn zero(self) -> ModRingElement<Self> {
         self.from_montgomery(Ring::Uint::zero())
     }
 
+    #[inline(always)]
     fn one(self) -> ModRingElement<Self> {
         self.from_montgomery(self.montgomery_r)
+    }
+
+    fn random<R: Rng + ?Sized>(self, rng: &mut R) -> ModRingElement<Self> {
+        self.from_montgomery(Ring::Uint::random(rng, self.modulus))
     }
 }
 
 impl<Ring: RingRef> ModRingElement<Ring> {
+    pub const fn from_montgomery(ring: Ring, value: Ring::Uint) -> Self {
+        ModRingElement { ring, value }
+    }
+
     pub fn ring(&self) -> &ModRing<Ring::Uint> {
         &self.ring
     }
@@ -124,19 +164,45 @@ impl<Ring: RingRef> ModRingElement<Ring> {
         self.ring.mont_mul(self.value, Ring::Uint::one())
     }
 
+    #[inline(always)]
+    pub fn square(mut self) -> Self {
+        self.value = self.ring.mont_square(self.value);
+        self
+    }
+
     /// Small exponentiation
     ///
     /// Run time may depend on the exponent, use [`pow_ct`] if constant time is required.
-    pub fn pow(self, exponent: u64) -> Self {
+    #[inline(always)]
+    pub fn pow(self, exponent: usize) -> Self {
         match exponent {
             0 => self.ring.one(),
             1 => self,
-            2 => self * self,
-            3 => self * self * self,
-            n if n % 4 == 0 => self.pow(n / 4),
-            n => self.pow(n % 4) * self.pow(n / 4),
+            n => {
+                let value = self.pow(exponent / 2).square();
+                if exponent % 2 == 1 {
+                    value * self
+                } else {
+                    value
+                }
+            }
         }
     }
+
+    /// Small exponentiation
+    ///
+    /// Run time may depend on the exponent, use [`pow_ct`] if constant time is required.
+    // pub fn pow(self, exponent: u64) -> Self {
+    //     match exponent {
+    //         0 => self.ring.one(),
+    //         1 => self,
+    //         n if n % 2 == 0 => {
+    //             let value = self.pow(n / 2).value;
+    //             let value = self.ring.mont_square(value);
+    //         }
+    //         n => self.pow(n % 4) * self.pow(n / 4),
+    //     }
+    // }
 
     /// Inversion
     ///
@@ -195,6 +261,7 @@ forward_fmt!(
 impl<Ring: RingRef> Add for ModRingElement<Ring> {
     type Output = Self;
 
+    #[inline(always)]
     fn add(mut self, other: Self) -> Self {
         self += other;
         self
@@ -204,6 +271,7 @@ impl<Ring: RingRef> Add for ModRingElement<Ring> {
 impl<Ring: RingRef> Sub for ModRingElement<Ring> {
     type Output = Self;
 
+    #[inline(always)]
     fn sub(mut self, other: Self) -> Self {
         self -= other;
         self
@@ -213,6 +281,7 @@ impl<Ring: RingRef> Sub for ModRingElement<Ring> {
 impl<Ring: RingRef> Mul for ModRingElement<Ring> {
     type Output = Self;
 
+    #[inline(always)]
     fn mul(mut self, other: Self) -> Self {
         self *= other;
         self
@@ -222,6 +291,7 @@ impl<Ring: RingRef> Mul for ModRingElement<Ring> {
 impl<Ring: RingRef> Neg for ModRingElement<Ring> {
     type Output = Self;
 
+    #[inline(always)]
     fn neg(self) -> Self {
         // TODO: Constant time
         if self.value.is_zero() {
@@ -239,6 +309,7 @@ impl<Ring: RingRef> Div for ModRingElement<Ring> {
     /// Division
     ///
     /// Run time may depend on the value of the divisor.
+    #[inline(always)]
     fn div(self, other: Self) -> Option<Self> {
         assert_eq!(self.ring(), other.ring());
         other.inv().map(|inv| self * inv)
@@ -246,6 +317,7 @@ impl<Ring: RingRef> Div for ModRingElement<Ring> {
 }
 
 impl<Ring: RingRef> AddAssign for ModRingElement<Ring> {
+    #[inline(always)]
     fn add_assign(&mut self, other: Self) {
         assert_eq!(self.ring(), other.ring());
         self.value = self.value.add_mod(other.value, self.ring.modulus);
@@ -253,15 +325,37 @@ impl<Ring: RingRef> AddAssign for ModRingElement<Ring> {
 }
 
 impl<Ring: RingRef> SubAssign for ModRingElement<Ring> {
+    #[inline(always)]
     fn sub_assign(&mut self, other: Self) {
         self.add_assign(other.neg())
     }
 }
 
 impl<Ring: RingRef> MulAssign for ModRingElement<Ring> {
+    #[inline(always)]
     fn mul_assign(&mut self, other: Self) {
         assert_eq!(self.ring(), other.ring());
         self.value = self.ring.mont_mul(self.value, other.value);
+    }
+}
+
+impl<Ring: RingRef + Default> Sum for ModRingElement<Ring> {
+    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
+        iter.reduce(|acc, e| acc + e)
+            .unwrap_or_else(|| Ring::default().zero())
+    }
+}
+
+impl<Ring: RingRef + Default> Product for ModRingElement<Ring> {
+    fn product<I: Iterator<Item = Self>>(iter: I) -> Self {
+        iter.reduce(|acc, e| acc * e)
+            .unwrap_or_else(|| Ring::default().one())
+    }
+}
+
+impl<Ring: RingRef + Default> Distribution<ModRingElement<Ring>> for Standard {
+    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> ModRingElement<Ring> {
+        Ring::default().random(rng)
     }
 }
 

@@ -8,6 +8,37 @@ license = "MIT"
 version = "0.1.0"
 edition = "2021"
 
+[lints.rust]
+unsafe_code = "warn"
+missing_docs = "warn"
+
+[lints.clippy]
+all = "warn"
+pendatic = "warn"
+nursery = "warn"
+cargo = "warn"
+perf = "warn"
+complexity = "warn"
+style = "warn"
+correctness = "warn"
+suspicous = "warn"
+missing_docs_in_private_items = { level = "allow", priority = 1 }
+
+[profile.release]
+debug = true # Generate symbol info for profiling
+
+# Doing light optimizations helps test performance more than it hurts build time.
+[profile.test]
+opt-level = 2
+
+# Compilation profile for any non-workspace member. We want to optimize these even in debug mode.
+[profile.dev.package."*"]
+opt-level = 3
+
+[features]
+default = ["proxmark3"]
+proxmark3 = ["rusb"]
+
 [dependencies]
 aes = "0.8.4"
 anyhow = "1.0.89"
@@ -27,7 +58,12 @@ hex-literal = "0.4.1"
 num-traits = "0.2.19"
 num_enum = "0.7.3"
 rand = "0.8.5"
-ruint = { version = "1.12.3", features = ["rand", "subtle", "der", "num-traits"] }
+ruint = { version = "1.12.3", features = [
+    "rand",
+    "subtle",
+    "der",
+    "num-traits",
+] }
 rusb = { version = "0.9.4", optional = true }
 sha1 = "0.10.6"
 sha2 = "0.10.8"
@@ -41,10 +77,5 @@ serde = "1.0.210"
 serde_json = "1.0.128"
 base64 = "0.22.1"
 
-[features]
-default = ["proxmark3"]
-proxmark3 = ["rusb"]
-
 [patch.crates-io]
-ruint = { git = "https://github.com/recmo/uint", branch = "recmo/der" }
-# ruint = { path = "../uint" }
+ruint = { git = "https://github.com/recmo/uint", branch = "recmo/montgomery" }
