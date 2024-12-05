@@ -476,45 +476,42 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        super::{
-            named::{CURVE_1, CURVE_2, CURVE_3, CURVE_4, CURVE_5},
-            test_dh, test_schnorr,
-        },
-        *,
+    use super::super::{
+        named::{secp192r1, secp224r1, secp256r1, secp384r1, secp521r1},
+        test_dh, test_schnorr,
     };
 
     #[test]
-    fn test_curve_1() {
-        let group = EllipticCurve::from(CURVE_1);
+    fn test_secp192r1() {
+        let group = secp192r1();
         test_dh(&group);
         test_schnorr(&group);
     }
 
     #[test]
-    fn test_curve_2() {
-        let group = EllipticCurve::from(CURVE_2);
+    fn test_secp224r1() {
+        let group = secp224r1();
         test_dh(&group);
         test_schnorr(&group);
     }
 
     #[test]
-    fn test_curve_3() {
-        let group = EllipticCurve::from(CURVE_3);
+    fn test_secp256r1() {
+        let group = secp256r1();
         test_dh(&group);
         test_schnorr(&group);
     }
 
     #[test]
-    fn test_curve_4() {
-        let group = EllipticCurve::from(CURVE_4);
+    fn test_secp384r1() {
+        let group = secp384r1();
         test_dh(&group);
         test_schnorr(&group);
     }
 
     #[test]
-    fn test_curve_5() {
-        let group = EllipticCurve::from(CURVE_5);
+    fn test_secp521r1() {
+        let group = secp521r1();
         test_dh(&group);
         test_schnorr(&group);
     }

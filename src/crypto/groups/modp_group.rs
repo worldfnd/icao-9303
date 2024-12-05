@@ -7,7 +7,6 @@ use {
         CryptoCoreRng, CryptoGroup,
     },
     anyhow::{ensure, Result},
-    num_traits::Pow,
     subtle::ConditionallySelectable,
 };
 
@@ -83,31 +82,28 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        super::{
-            named::{GROUP_1, GROUP_2, GROUP_3},
-            test_dh, test_schnorr,
-        },
-        *,
+    use super::super::{
+        named::{modp_160, modp_224, modp_256},
+        test_dh, test_schnorr,
     };
 
     #[test]
-    fn test_group_1() {
-        let group = ModPGroup::from(GROUP_1);
+    fn test_modp_160() {
+        let group = modp_160();
         test_dh(&group);
         test_schnorr(&group);
     }
 
     #[test]
-    fn test_group_2() {
-        let group = ModPGroup::from(GROUP_2);
+    fn test_modp_224() {
+        let group = modp_224();
         test_dh(&group);
         test_schnorr(&group);
     }
 
     #[test]
-    fn test_group_3() {
-        let group = ModPGroup::from(GROUP_3);
+    fn test_modp_256() {
+        let group = modp_256();
         test_dh(&group);
         test_schnorr(&group);
     }
