@@ -1,9 +1,8 @@
+#![allow(clippy::suspicious_arithmetic_impl)]
+#![allow(clippy::suspicious_op_assign_impl)]
 use {
     num_traits::{Inv, One, Pow, Zero},
-    std::{
-        ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign},
-        process::Output,
-    },
+    std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign},
 };
 
 /// Lowers a multiplicative group to additive operations.
@@ -14,7 +13,7 @@ impl<T> MulGroup<T> {
     /// Creates a new multiplicative group element.
     ///
     /// value should be invertible.
-    pub fn new(value: T) -> Self {
+    pub const fn new(value: T) -> Self {
         Self(value)
     }
 
@@ -133,7 +132,7 @@ mod tests {
     fn test_mulgroup() {
         let a = MulGroup::new(3_u64);
         let b = MulGroup::new(4_u64);
-
         assert_eq!(a + b, 12.into());
+        assert_eq!(a * 2_u32, 9.into());
     }
 }

@@ -2,11 +2,12 @@
 
 use {
     super::{
-        mod_ring::{ModRing, ModRingElementRef, RingRefExt, UintExp, UintMont},
+        super::mod_ring::{ModRing, ModRingElementRef, RingRefExt, UintExp, UintMont},
         mul_group::MulGroup,
         CryptoCoreRng, CryptoGroup,
     },
     anyhow::{ensure, Result},
+    num_traits::Pow,
     subtle::ConditionallySelectable,
 };
 
@@ -30,11 +31,15 @@ where
         ensure!(generator < modulus);
         let base_field = ModRing::from_modulus(modulus);
         let scalar_field = ModRing::from_modulus(order);
-        let generator_monty = base_field.from(generator).as_montgomery();
+        let generator = base_field.from(generator);
+        ensure!(
+            generator.pow_ct(scalar_field.modulus()) == base_field.one(),
+            "Generator has incorrect order"
+        );
         Ok(Self {
             base_field,
             scalar_field,
-            generator_monty,
+            generator_monty: generator.as_montgomery(),
         })
     }
 
@@ -70,18 +75,20 @@ where
     }
 
     fn random_scalar(&'s self, rng: &mut dyn CryptoCoreRng) -> Self::ScalarElement {
+        // TODO: Use the range [2, order - 2] as per
+        // X9.42 (repro in RFC 2631) require [2, (q - 2)]
         self.scalar_field().random(rng)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::crypto::{
-            named_fields::{GROUP_1, GROUP_2, GROUP_3},
+    use super::{
+        super::{
+            named::{GROUP_1, GROUP_2, GROUP_3},
             test_dh, test_schnorr,
         },
+        *,
     };
 
     #[test]

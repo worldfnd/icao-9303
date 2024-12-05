@@ -4,15 +4,20 @@
 
 use {
     super::{
-        mod_ring::{UintExp, UintMont},
+        super::mod_ring::{UintExp, UintMont},
         modp_group::ModPGroup,
+        EllipticCurve,
     },
     ruint::{
         aliases::{U1024, U160, U192, U2048, U256, U384},
         uint, Uint,
     },
+    std::sync::OnceLock,
     subtle::ConditionallySelectable,
 };
+
+// TODO: Lazy create these groups and curves using uncheck constructors.
+// TODO: Construct and run tests using checked constructors.
 
 type U224 = Uint<224, 4>;
 type U521 = Uint<521, 9>;
@@ -31,6 +36,14 @@ pub struct Curve<U, V> {
     pub param_b:   U,
     pub generator: (U, U),
     pub order:     V,
+}
+
+pub fn modp_160() -> &'static ModPGroup<U1024, U160> {
+    static GROUP: OnceLock<ModPGroup<U1024, U160>> = OnceLock::new();
+    GROUP.get_or_init(|| uint!(ModPGroup::new(
+        0xB10B8F96_A080E01D_DE92DE5E_AE5D54EC_52C99FBC_FB06A3C6_9A6A9DCA_52D23B61_6073E286_75A23D18_9838EF1E_2EE652C0_13ECB4AE_A9061123_24975C3C_D49B83BF_ACCBDD7D_90C4BD70_98488E9C_219A7372_4EFFD6FA_E5644738_FAA31A4F_F55BCCC0_A151AF5F_0DC8B4BD_45BF37DF_365C1A65_E68CFDA7_6D4DA708_DF1FB2BC_2E4A4371_U1024,
+        0xA4D1CBD5_C3FD3412_6765A442_EFB99905_F8104DD2_58AC507F_D6406CFF_14266D31_266FEA1E_5C41564B_777E690F_5504F213_160217B4_B01B886A_5E91547F_9E2749F4_D7FBD7D3_B9A92EE1_909D0D22_63F80A76_A6A24C08_7A091F53_1DBF0A01_69B6A28A_D662A4D1_8E73AFA3_2D779D59_18D08BC8_858F4DCE_F97C2A24_855E6EEB_22B3B2E5_U1024,
+        0xF518AA87_81A8DF27_8ABA4E7D_64B7CB9D_49462353_U160)).unwrap())
 }
 
 /// RFC 5114 1024-bit MODP Group with 160-bit Prime Order Subgroup
@@ -92,8 +105,8 @@ pub const CURVE_3: Curve<U256, U256> = uint!(Curve {
 
 /// RFC 5114 384-bit Random ECP Group, NIST P-384, secp384r1
 pub const CURVE_4: Curve<U384, U384> = uint!(Curve {
-   modulus: 0xffffffff_ffffffff_ffffffff_ffffffff_ffffffff_ffffffff_fffffffe_ffffffff_00000000_00000000_ffffffff_U384,
-   param_a: 0xffffffff_ffffffff_ffffffff_ffffffff_ffffffff_ffffffff_fffffffe_ffffffff_00000000_00000000_fffffffc_U384,
+   modulus: 0xFFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFE_FFFFFFFF_00000000_00000000_FFFFFFFF_U384,
+   param_a: 0xFFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFE_FFFFFFFF_00000000_00000000_FFFFFFFC_U384,
    param_b: 0xB3312FA7_E23EE7E4_988E056B_E3F82D19_181D9C6E_FE814112_0314088F_5013875A_C656398D_8A2ED19D_2A85C8ED_D3EC2AEF_U384,
    generator: (
         0xAA87CA22_BE8B0537_8EB1C71E_F320AD74_6E1D3B62_8BA79B98_59F741E0_82542A38_5502F25D_BF55296C_3A545E38_72760AB7_U384,
@@ -109,7 +122,7 @@ pub const CURVE_5: Curve<U521, U521> = uint!(Curve {
     param_b: 0x00000051_953EB961_8E1C9A1F_929A21A0_B68540EE_A2DA725B_99B315F3_B8B48991_8EF109E1_56193951_EC7E937B_1652C0BD_3BB1BF07_3573DF88_3D2C34F1_EF451FD4_6B503F00_U521,
     generator: (
         0x000000C6_858E06B7_0404E9CD_9E3ECB66_2395B442_9C648139_053FB521_F828AF60_6B4D3DBA_A14B5E77_EFE75928_FE1DC127_A2FFA8DE_3348B3C1_856A429B_F97E7E31_C2E5BD66_U521,
-        0x00000118_39296A78_9A3BC004_5C8A5FB4_2C7D1BD9_98F54449_579B4468_17AFBD17_273E662C_97EE7299_5EF42640_U521,
+        0x00000118_39296A78_9A3BC004_5C8A5FB4_2C7D1BD9_98F54449_579B4468_17AFBD17_273E662C_97EE7299_5EF42640_C550B901_3FAD0761_353C7086_A272C240_88BE9476_9FD16650_U521,
     ),
     order: 0x000001FF_FFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFA_51868783_BF2F966B_7FCC0148_F709A5D0_3BB5C9B8_899C47AE_BB6FB71E_91386409_U521,
 });
@@ -121,6 +134,25 @@ where
 {
     fn from(value: Group<U, V>) -> Self {
         ModPGroup::new(value.modulus, value.generator, value.order).unwrap()
+    }
+}
+
+impl<U, V> From<Curve<U, V>> for EllipticCurve<U, V>
+where
+    U: UintMont + ConditionallySelectable,
+    V: UintMont + UintExp,
+{
+    fn from(curve: Curve<U, V>) -> Self {
+        EllipticCurve::new(
+            curve.modulus,
+            curve.param_a,
+            curve.param_b,
+            curve.generator.0,
+            curve.generator.1,
+            curve.order,
+            V::from_u64(1),
+        )
+        .unwrap()
     }
 }
 

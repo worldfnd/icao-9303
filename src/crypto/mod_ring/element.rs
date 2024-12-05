@@ -6,7 +6,7 @@ use {
         Rng,
     },
     std::{
-        fmt::{self, Debug, Formatter},
+        fmt::{self, Formatter},
         iter::{Product, Sum},
         ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign},
     },
