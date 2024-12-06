@@ -109,6 +109,7 @@ impl<const BITS: usize, const LIMBS: usize> UintMont for Uint<BITS, LIMBS> {
 
     #[inline]
     fn sqrt_mont(self, modulus: Self, mont_r: Self, mod_inv: u64) -> Option<Self> {
+        // TODO: This requires modulus to be prime.
         let candidate = match modulus.to::<u64>() & 3 {
             3 | 7 => {
                 let exponent = (modulus >> 2) + Self::from_u64(1);

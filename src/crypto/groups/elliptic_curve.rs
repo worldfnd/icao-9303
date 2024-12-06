@@ -206,6 +206,15 @@ impl<'a, U: UintMont> EllipticCurvePoint<'a, U> {
         }
     }
 
+    pub const fn coordinates(
+        &self,
+    ) -> Option<(ModRingElementRef<'a, U>, ModRingElementRef<'a, U>)> {
+        match self.coordinates {
+            Coordinates::Infinity => None,
+            Coordinates::Affine(x, y) => Some((x, y)),
+        }
+    }
+
     pub const fn x(&self) -> Option<ModRingElementRef<'a, U>> {
         match self.coordinates {
             Coordinates::Infinity => None,

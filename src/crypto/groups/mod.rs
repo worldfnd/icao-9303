@@ -3,7 +3,7 @@
 mod elliptic_curve;
 mod modp_group;
 mod mul_group;
-mod named;
+pub mod named;
 
 pub use self::elliptic_curve::{EllipticCurve, EllipticCurvePoint};
 use {
