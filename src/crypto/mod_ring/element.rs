@@ -72,20 +72,7 @@ impl<Ring: RingRef> ModRingElement<Ring> {
             n => self * self.pow(n / 2).square(),
         }
     }
-}
 
-impl<Ring: RingRef + Default> ModRingElement<Ring> {
-    #[inline]
-    #[must_use]
-    pub fn from(value: Ring::Uint) -> Self {
-        Ring::default().from(value)
-    }
-}
-
-impl<Ring: RingRef> ModRingElement<Ring>
-where
-    Ring::Uint: ConditionallySelectable,
-{
     /// Constant-time exponentation with arbitrary unsigned int exponent.
     #[must_use]
     pub fn pow_ct<U: UintExp>(self, exponent: U) -> Self {
@@ -100,6 +87,24 @@ where
         }
         let value = result.value;
         self.ring.from_montgomery(value)
+    }
+
+    /// Square root of the element.
+    ///
+    /// Requires the modulus to be a prime number with p mod 8 in {3, 5, 7}.
+    // TODO: Tonelli-Shanks algorithm.
+    pub fn sqrt(self) -> Option<Self> {
+        self.ring
+            .mont_sqrt(self.value)
+            .map(|value| self.ring.from_montgomery(value))
+    }
+}
+
+impl<Ring: RingRef + Default> ModRingElement<Ring> {
+    #[inline]
+    #[must_use]
+    pub fn from(value: Ring::Uint) -> Self {
+        Ring::default().from(value)
     }
 }
 

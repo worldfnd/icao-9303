@@ -30,6 +30,9 @@ pub trait UintMont:
     fn mul_redc(self, other: Self, modulus: Self, mod_inv: u64) -> Self;
     fn square_redc(self, modulus: Self, mod_inv: u64) -> Self;
     fn inv_mod(self, modulus: Self) -> Option<Self>;
+
+    /// Square root in Montgomery form.
+    fn sqrt_mont(self, modulus: Self, mont_r: Self, mod_inv: u64) -> Option<Self>;
 }
 
 impl<const BITS: usize, const LIMBS: usize> UintMont for Uint<BITS, LIMBS> {
@@ -103,6 +106,52 @@ impl<const BITS: usize, const LIMBS: usize> UintMont for Uint<BITS, LIMBS> {
     fn inv_mod(self, modulus: Self) -> Option<Self> {
         Self::inv_mod(self, modulus)
     }
+
+    #[inline]
+    fn sqrt_mont(self, modulus: Self, mont_r: Self, mod_inv: u64) -> Option<Self> {
+        let candidate = match modulus.to::<u64>() & 3 {
+            3 | 7 => {
+                let exponent = (modulus >> 2) + Self::from_u64(1);
+                pow(self, exponent, modulus, mont_r, mod_inv)
+            }
+            5 => {
+                let exponent = (modulus >> 3) + Self::from_u64(1);
+                let candidate = pow(self, exponent, modulus, mont_r, mod_inv);
+                if candidate.square_redc(modulus, mod_inv) == self {
+                    return Some(candidate);
+                }
+                // Multiply by 2^((modulus - 1) / 4)
+                let exponent = modulus >> 2;
+                let two = mont_r.add_mod(mont_r, modulus);
+                let factor = pow(two, exponent, modulus, mont_r, mod_inv);
+                candidate.mul_redc(factor, modulus, mod_inv)
+            }
+            _ => unimplemented!("Square root only implemented for primes that are 3, 5, 7 mod 8."),
+        };
+        if candidate.square_redc(modulus, mod_inv) == self {
+            Some(candidate)
+        } else {
+            None
+        }
+    }
+}
+
+fn pow<const BITS: usize, const LIMBS: usize>(
+    base: Uint<BITS, LIMBS>,
+    exponent: Uint<BITS, LIMBS>,
+    modulus: Uint<BITS, LIMBS>,
+    mont_r: Uint<BITS, LIMBS>,
+    mod_inv: u64,
+) -> Uint<BITS, LIMBS> {
+    let mut result = mont_r;
+    let mut power = base;
+    for i in 0..exponent.bit_len() {
+        if exponent.bit(i) {
+            result = result.mul_redc(power, modulus, mod_inv);
+        }
+        power = power.square_redc(modulus, mod_inv);
+    }
+    result
 }
 
 #[cfg(test)]

@@ -75,4 +75,11 @@ impl<Uint: UintMont> ModRing<Uint> {
     pub(super) fn mont_square(&self, a: Uint) -> Uint {
         a.square_redc(self.modulus, self.mod_inv)
     }
+
+    /// Montgomery square root for certain select moduli.
+    #[inline]
+    #[must_use]
+    pub(super) fn mont_sqrt(&self, a: Uint) -> Option<Uint> {
+        a.sqrt_mont(self.modulus, self.montgomery_r, self.mod_inv)
+    }
 }

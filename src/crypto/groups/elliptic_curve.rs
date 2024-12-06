@@ -141,6 +141,18 @@ impl<U: UintMont> EllipticCurve<U> {
         })
     }
 
+    /// Returns a point with x-coordinate `x` if it exists.
+    /// If a solution `p` exists, the other solution is `-p`.
+    pub fn from_x<'a>(&'a self, x: ModRingElementRef<'a, U>) -> Option<EllipticCurvePoint<'a, U>> {
+        assert_eq!(x.ring(), &self.base_field);
+        let y2 = x.pow(3) + self.a() * x + self.b();
+        let y = y2.sqrt()?;
+        Some(EllipticCurvePoint {
+            curve:       self,
+            coordinates: Coordinates::Affine(x, y),
+        })
+    }
+
     pub fn from_montgomery(
         &self,
         coordinates: Option<(U, U)>,
@@ -421,7 +433,10 @@ impl<'a, U: 'a + UintMont> CryptoGroup<'a> for EllipticCurve<U> {
 #[cfg(test)]
 mod tests {
     use super::super::{
-        named::{secp192r1, secp224r1, secp256r1, secp384r1, secp521r1},
+        named::{
+            brainpool_p160r1, brainpool_p512r1, secp192r1, secp224r1, secp256r1, secp384r1,
+            secp521r1,
+        },
         test_dh, test_schnorr,
     };
 
@@ -456,6 +471,20 @@ mod tests {
     #[test]
     fn test_secp521r1() {
         let group = secp521r1();
+        test_dh(&group);
+        test_schnorr(&group);
+    }
+
+    #[test]
+    fn test_brainpool_p160r1() {
+        let group = brainpool_p160r1();
+        test_dh(&group);
+        test_schnorr(&group);
+    }
+
+    #[test]
+    fn test_brainpool_brainpool_p512r1() {
+        let group = brainpool_p512r1();
         test_dh(&group);
         test_schnorr(&group);
     }
