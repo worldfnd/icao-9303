@@ -1,6 +1,5 @@
 use {
     super::{ModRing, ModRingElement, UintMont},
-    num_traits::Zero,
     rand::Rng,
     std::ops::Deref,
 };
@@ -50,7 +49,7 @@ impl<Ring: RingRef> RingRefExt for Ring {
 
     #[inline(always)]
     fn zero(self) -> ModRingElement<Self> {
-        self.from_montgomery(Ring::Uint::zero())
+        self.from_montgomery(Ring::Uint::from_u64(0))
     }
 
     #[inline(always)]

@@ -1,9 +1,9 @@
 use {
-    super::ModRing,
-    num_traits::{One, Zero},
+    super::{ModRing, UintExp},
     rand::Rng,
     ruint::{aliases::U64, Uint},
-    std::{fmt::Debug, ops::Sub},
+    std::fmt::Debug,
+    subtle::{ConditionallySelectable, ConstantTimeEq},
 };
 
 /// Trait for Uint backends supporting Montgomery multiplication.
@@ -12,7 +12,15 @@ use {
 /// if we abstract this, otherwise we would have to pass along the
 /// const-generic parameters everywhere.
 pub trait UintMont:
-    Sized + Copy + PartialEq + Eq + PartialOrd + Debug + Zero + One + Sub<Output = Self>
+    Sized
+    + Copy
+    + PartialEq
+    + Eq
+    + PartialOrd
+    + Debug
+    + ConstantTimeEq
+    + ConditionallySelectable
+    + UintExp
 {
     fn parameters_from_modulus(modulus: Self) -> ModRing<Self>;
     fn from_u64(value: u64) -> Self;
@@ -83,17 +91,17 @@ impl<const BITS: usize, const LIMBS: usize> UintMont for Uint<BITS, LIMBS> {
 
     #[inline]
     fn mul_redc(self, other: Self, modulus: Self, mod_inv: u64) -> Self {
-        Uint::mul_redc(self, other, modulus, mod_inv)
+        Self::mul_redc(self, other, modulus, mod_inv)
     }
 
     #[inline]
     fn square_redc(self, modulus: Self, mod_inv: u64) -> Self {
-        Uint::square_redc(self, modulus, mod_inv)
+        Self::square_redc(self, modulus, mod_inv)
     }
 
     #[inline]
     fn inv_mod(self, modulus: Self) -> Option<Self> {
-        Uint::inv_mod(self, modulus)
+        Self::inv_mod(self, modulus)
     }
 }
 

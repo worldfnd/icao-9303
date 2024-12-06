@@ -37,7 +37,7 @@ pub fn modp_256() -> ModPGroup<U2048, U256> {
 }
 
 /// RFC 5114 192-bit Random ECP Group, NIST P-192, secp192r1
-pub fn secp192r1() -> EllipticCurve<U192, U192> {
+pub fn secp192r1() -> EllipticCurve<U192> {
     uint!(EllipticCurve::new(
         0xffffffff_ffffffff_ffffffff_fffffffe_ffffffff_ffffffff_U192,
         0xffffffff_ffffffff_ffffffff_fffffffe_ffffffff_fffffffc_U192,
@@ -51,7 +51,7 @@ pub fn secp192r1() -> EllipticCurve<U192, U192> {
 }
 
 /// RFC 5114 224-bit Random ECP Group, NIST P-224, secp224r1
-pub fn secp224r1() -> EllipticCurve<U224, U224> {
+pub fn secp224r1() -> EllipticCurve<U224> {
     uint!(EllipticCurve::new(
         0xffffffff_ffffffff_ffffffff_ffffffff_00000000_00000000_00000001_U224,
         0xffffffff_ffffffff_ffffffff_fffffffe_ffffffff_ffffffff_fffffffe_U224,
@@ -65,7 +65,7 @@ pub fn secp224r1() -> EllipticCurve<U224, U224> {
 }
 
 /// RFC 5114 256-bit Random ECP Group, NIST P-256, secp256r1
-pub fn secp256r1() -> EllipticCurve<U256, U256> {
+pub fn secp256r1() -> EllipticCurve<U256> {
     uint!(EllipticCurve::new(
         0xffffffff_00000001_00000000_00000000_00000000_ffffffff_ffffffff_ffffffff_U256,
         0xffffffff_00000001_00000000_00000000_00000000_ffffffff_ffffffff_fffffffc_U256,
@@ -79,7 +79,7 @@ pub fn secp256r1() -> EllipticCurve<U256, U256> {
 }
 
 /// RFC 5114 384-bit Random ECP Group, NIST P-384, secp384r1
-pub fn secp384r1() -> EllipticCurve<U384, U384> {
+pub fn secp384r1() -> EllipticCurve<U384> {
     uint!(EllipticCurve::new(
         0xFFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFE_FFFFFFFF_00000000_00000000_FFFFFFFF_U384,
         0xFFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFE_FFFFFFFF_00000000_00000000_FFFFFFFC_U384,
@@ -93,7 +93,7 @@ pub fn secp384r1() -> EllipticCurve<U384, U384> {
 }
 
 /// RFC 5114 521-bit Random ECP Group, NIST P-521, secp521r1
-pub fn secp521r1() -> EllipticCurve<U521, U521> {
+pub fn secp521r1() -> EllipticCurve<U521> {
     uint!(EllipticCurve::new(
         0x000001FF_FFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFF_U521,
         0x000001FF_FFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFC_U521,
@@ -107,7 +107,7 @@ pub fn secp521r1() -> EllipticCurve<U521, U521> {
 }
 
 /// RFC 5639 brainpoolP160r1
-pub fn brainpool_p160r1() -> EllipticCurve<U160, U160> {
+pub fn brainpool_p160r1() -> EllipticCurve<U160> {
     uint!(EllipticCurve::new(
         0xe95e4a5f737059dc60dfc7ad95b3d8139515620f_U160,
         0x340e7be2a280eb74e2be61bada745d97e8f7c300_U160,
@@ -121,7 +121,7 @@ pub fn brainpool_p160r1() -> EllipticCurve<U160, U160> {
 }
 
 /// RFC 5639 brainpoolP192r1
-pub fn brainpool_p192r1() -> EllipticCurve<U192, U192> {
+pub fn brainpool_p192r1() -> EllipticCurve<U192> {
     uint!(EllipticCurve::new(
         0xc302f41d932a36cda7a3463093d18db78fce476de1a86297_U192,
         0x6a91174076b1e0e19c39c031fe8685c1cae040e5c69a28ef_U192,
@@ -135,7 +135,7 @@ pub fn brainpool_p192r1() -> EllipticCurve<U192, U192> {
 }
 
 /// RFC 5639 brainpoolP224r1
-pub fn brainpool_p224r1() -> EllipticCurve<U224, U224> {
+pub fn brainpool_p224r1() -> EllipticCurve<U224> {
     uint!(EllipticCurve::new(
         0xd7c134aa264366862a18302575d1d787b09f075797da89f57ec8c0ff_U224,
         0x68a5e62ca9ce6c1c299803a6c1530b514e182ad8b0042a59cad29f43_U224,
@@ -149,7 +149,7 @@ pub fn brainpool_p224r1() -> EllipticCurve<U224, U224> {
 }
 
 /// RFC 5639 brainpoolP256r1
-pub fn brainpool_p256r1() -> EllipticCurve<U256, U256> {
+pub fn brainpool_p256r1() -> EllipticCurve<U256> {
     uint!(EllipticCurve::new(
         0xa9fb57dba1eea9bc3e660a909d838d726e3bf623d52620282013481d1f6e5377_U256,
         0x7d5a0975fc2c3057eef67530417affe7fb8055c126dc5c6ce94a4b44f330b5d9_U256,
@@ -163,7 +163,7 @@ pub fn brainpool_p256r1() -> EllipticCurve<U256, U256> {
 }
 
 /// RFC 5639 brainpoolP320r1
-pub fn brainpool_p320r1() -> EllipticCurve<U320, U320> {
+pub fn brainpool_p320r1() -> EllipticCurve<U320> {
     uint!(EllipticCurve::new(
         0xd35e472036bc4fb7e13c785ed201e065f98fcfa6f6f40def4f92b9ec7893ec28fcd412b1f1b32e27_U320,
         0x3ee30b568fbab0f883ccebd46d3f3bb8a2a73513f5eb79da66190eb085ffa9f492f375a97d860eb4_U320,
@@ -177,7 +177,7 @@ pub fn brainpool_p320r1() -> EllipticCurve<U320, U320> {
 }
 
 /// RFC 5639 brainpoolP384r1
-pub fn brainpool_p384r1() -> EllipticCurve<U384, U384> {
+pub fn brainpool_p384r1() -> EllipticCurve<U384> {
     uint!(EllipticCurve::new(
 0x8CB91E82A3386D280F5D6F7E50E641DF152F7109ED5456B412B1DA197FB71123ACD3A729901D1A71874700133107EC53_U384,
 0x7BC382C63D8C150C3C72080ACE05AFA0C2BEA28E4FB22787139165EFBA91F90F8AA5814A503AD4EB04A8C7DD22CE2826_U384,
@@ -191,7 +191,7 @@ pub fn brainpool_p384r1() -> EllipticCurve<U384, U384> {
 }
 
 /// RFC 5639 brainpoolP512r1
-pub fn brainpool_p512r1() -> EllipticCurve<U512, U512> {
+pub fn brainpool_p512r1() -> EllipticCurve<U512> {
     uint!(EllipticCurve::new(
 0xAADD9DB8DBE9C48B3FD4E6AE33C9FC07CB308DB3B3C9D20ED6639CCA703308717D4D9B009BC66842AECDA12AE6A380E62881FF2F2D82C68528AA6056583A48F3_U512,
 0x7830A3318B603B89E2327145AC234CC594CBDD8D3DF91610A83441CAEA9863BC2DED5D5AA8253AA10A2EF1C98B9AC8B57F1117A72BF2C7B9E7C1AC4D77FC94CA_U512,

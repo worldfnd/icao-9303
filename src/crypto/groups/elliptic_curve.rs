@@ -13,44 +13,29 @@ use {
 };
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
-pub struct EllipticCurve<U, V>
-where
-    U: UintMont + ConditionallySelectable,
-    V: UintMont + UintExp,
-{
+pub struct EllipticCurve<U: UintMont> {
     base_field:      ModRing<U>,
-    scalar_field:    ModRing<V>,
+    scalar_field:    ModRing<U>,
     a_monty:         U,
     b_monty:         U,
-    cofactor:        V,
+    cofactor:        U,
     generator_monty: (U, U),
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct EllipticCurvePoint<'a, U, V>
-where
-    U: UintMont + ConditionallySelectable,
-    V: UintMont + UintExp,
-{
-    curve:       &'a EllipticCurve<U, V>,
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct EllipticCurvePoint<'a, U: UintMont> {
+    curve:       &'a EllipticCurve<U>,
     coordinates: Coordinates<'a, U>,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
-enum Coordinates<'a, U>
-where
-    U: UintMont + ConditionallySelectable,
-{
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Coordinates<'a, U: UintMont> {
     Infinity,
     Affine(ModRingElementRef<'a, U>, ModRingElementRef<'a, U>),
 }
 
-impl<U, V> EllipticCurve<U, V>
-where
-    U: UintMont + ConditionallySelectable,
-    V: UintMont + UintExp,
-{
-    pub fn new(modulus: U, a: U, b: U, x: U, y: U, order: V, cofactor: V) -> Result<Self> {
+impl<U: UintMont> EllipticCurve<U> {
+    pub fn new(modulus: U, a: U, b: U, x: U, y: U, order: U, cofactor: U) -> Result<Self> {
         ensure!(a < modulus, "a not in field");
         ensure!(b < modulus, "b not in field");
         ensure!(x < modulus, "x not in field");
@@ -61,6 +46,8 @@ where
         let b = base_field.from(b);
         let x = base_field.from(x);
         let y = base_field.from(y);
+        // TODO: Check if modulus and order are prime.
+        // TODO: Check Hasse bound.
 
         // Ensure non-singular
         let c4 = base_field.from_u64(4);
@@ -69,6 +56,18 @@ where
             c4 * a.pow(3) + c27 * b.pow(2) != base_field.zero(),
             "Singular curve"
         );
+
+        // Ensure not anomalous
+        ensure!(modulus != order, "Anomalous curve");
+
+        // Ensure high embedding degree.
+        // BSI TR-03111:2018 requires embedding degree at least 10^4.
+        // let p = scalar_field.from(modulus);
+        // let mut pe = scalar_field.one();
+        // for i in 1..=10_000 {
+        //     pe *= p;
+        //     ensure!(pe != scalar_field.one(), "Low embedding degree {}", i);
+        // }
 
         // Ensure generator is on curve
         ensure!(y.pow(2) == x.pow(3) + a * x + b, "Generator not on curve");
@@ -96,7 +95,7 @@ where
         &self.base_field
     }
 
-    pub const fn scalar_field(&self) -> &ModRing<V> {
+    pub const fn scalar_field(&self) -> &ModRing<U> {
         &self.scalar_field
     }
 
@@ -108,11 +107,11 @@ where
         self.base_field.from_montgomery(self.b_monty)
     }
 
-    pub const fn cofactor(&self) -> V {
+    pub const fn cofactor(&self) -> U {
         self.cofactor
     }
 
-    pub fn generator(&self) -> EllipticCurvePoint<'_, U, V> {
+    pub fn generator(&self) -> EllipticCurvePoint<'_, U> {
         EllipticCurvePoint {
             curve:       self,
             coordinates: Coordinates::Affine(
@@ -123,7 +122,7 @@ where
     }
 
     /// Point at infinity
-    pub const fn infinity(&self) -> EllipticCurvePoint<'_, U, V> {
+    pub const fn infinity(&self) -> EllipticCurvePoint<'_, U> {
         EllipticCurvePoint {
             curve:       self,
             coordinates: Coordinates::Infinity,
@@ -134,7 +133,7 @@ where
         &'a self,
         x: ModRingElementRef<'a, U>,
         y: ModRingElementRef<'a, U>,
-    ) -> Result<EllipticCurvePoint<'a, U, V>> {
+    ) -> Result<EllipticCurvePoint<'a, U>> {
         self.ensure_valid(x, y)?;
         Ok(EllipticCurvePoint {
             curve:       self,
@@ -145,7 +144,7 @@ where
     pub fn from_montgomery(
         &self,
         coordinates: Option<(U, U)>,
-    ) -> Result<EllipticCurvePoint<'_, U, V>> {
+    ) -> Result<EllipticCurvePoint<'_, U>> {
         match coordinates {
             Some((x, y)) => self.from_affine(
                 self.base_field.from_montgomery(x),
@@ -169,7 +168,7 @@ where
             "Point not on curve."
         );
 
-        if self.cofactor() != V::one() {
+        if self.cofactor() != U::from_u64(1) {
             let point = EllipticCurvePoint {
                 curve:       self,
                 coordinates: Coordinates::Affine(x, y),
@@ -183,12 +182,8 @@ where
     }
 }
 
-impl<'a, U, V> EllipticCurvePoint<'a, U, V>
-where
-    U: UintMont + ConditionallySelectable,
-    V: UintMont + UintExp,
-{
-    pub const fn curve(&self) -> &'a EllipticCurve<U, V> {
+impl<'a, U: UintMont> EllipticCurvePoint<'a, U> {
+    pub const fn curve(&self) -> &'a EllipticCurve<U> {
         self.curve
     }
 
@@ -226,11 +221,7 @@ where
 macro_rules! forward_fmt {
     ($($trait:path),+) => {
         $(
-            impl<'a, U, V> $trait for EllipticCurvePoint<'a, U, V>
-            where
-                U: UintMont + ConditionallySelectable + $trait,
-                V: UintMont + UintExp,
-            {
+            impl<'a, U: UintMont + $trait> $trait for EllipticCurvePoint<'a, U> {
                 fn fmt(&self, f: &mut Formatter) -> fmt::Result {
                     match self.coordinates {
                         Coordinates::Infinity => write!(f, "Infinity"),
@@ -257,11 +248,7 @@ forward_fmt!(
     fmt::UpperHex
 );
 
-impl<U, V> Add for EllipticCurvePoint<'_, U, V>
-where
-    U: UintMont + ConditionallySelectable,
-    V: UintMont + UintExp,
-{
+impl<U: UintMont> Add for EllipticCurvePoint<'_, U> {
     type Output = Self;
 
     fn add(self, other: Self) -> Self::Output {
@@ -301,21 +288,13 @@ where
     }
 }
 
-impl<U, V> AddAssign for EllipticCurvePoint<'_, U, V>
-where
-    U: UintMont + ConditionallySelectable,
-    V: UintMont + UintExp,
-{
+impl<U: UintMont> AddAssign for EllipticCurvePoint<'_, U> {
     fn add_assign(&mut self, other: Self) {
         *self = *self + other;
     }
 }
 
-impl<U, V> Neg for EllipticCurvePoint<'_, U, V>
-where
-    U: UintMont + ConditionallySelectable,
-    V: UintMont + UintExp,
-{
+impl<U: UintMont> Neg for EllipticCurvePoint<'_, U> {
     type Output = Self;
 
     fn neg(self) -> Self::Output {
@@ -329,69 +308,46 @@ where
     }
 }
 
-impl<U, V> Sub for EllipticCurvePoint<'_, U, V>
-where
-    U: UintMont + ConditionallySelectable,
-    V: UintMont + UintExp,
-{
+impl<U: UintMont> Sub for EllipticCurvePoint<'_, U> {
     type Output = Self;
 
+    #[allow(clippy::suspicious_arithmetic_impl)]
     fn sub(self, other: Self) -> Self::Output {
         self + other.neg()
     }
 }
 
-impl<U, V> SubAssign for EllipticCurvePoint<'_, U, V>
-where
-    U: UintMont + ConditionallySelectable,
-    V: UintMont + UintExp,
-{
+impl<U: UintMont> SubAssign for EllipticCurvePoint<'_, U> {
     fn sub_assign(&mut self, other: Self) {
         *self = *self - other;
     }
 }
 
-impl<'a, U, V> Mul<ModRingElementRef<'a, V>> for EllipticCurvePoint<'a, U, V>
-where
-    U: UintMont + ConditionallySelectable,
-    V: UintMont + UintExp,
-{
+impl<'a, U: UintMont> Mul<ModRingElementRef<'a, U>> for EllipticCurvePoint<'a, U> {
     type Output = Self;
 
-    fn mul(self, scalar: ModRingElementRef<'a, V>) -> Self::Output {
+    fn mul(self, scalar: ModRingElementRef<'a, U>) -> Self::Output {
         assert_eq!(scalar.ring(), self.curve.scalar_field());
         self.mul_uint(scalar.to_uint())
     }
 }
 
-impl<'a, U, V> MulAssign<ModRingElementRef<'a, V>> for EllipticCurvePoint<'a, U, V>
-where
-    U: UintMont + ConditionallySelectable,
-    V: UintMont + UintExp,
-{
-    fn mul_assign(&mut self, scalar: ModRingElementRef<'a, V>) {
+impl<'a, U: UintMont> MulAssign<ModRingElementRef<'a, U>> for EllipticCurvePoint<'a, U> {
+    fn mul_assign(&mut self, scalar: ModRingElementRef<'a, U>) {
         *self = *self * scalar;
     }
 }
 
-impl<'a, U, V> Div<ModRingElementRef<'a, V>> for EllipticCurvePoint<'a, U, V>
-where
-    U: UintMont + ConditionallySelectable,
-    V: UintMont + UintExp,
-{
+impl<'a, U: UintMont> Div<ModRingElementRef<'a, U>> for EllipticCurvePoint<'a, U> {
     type Output = Option<Self>;
 
-    fn div(self, scalar: ModRingElementRef<'a, V>) -> Self::Output {
+    fn div(self, scalar: ModRingElementRef<'a, U>) -> Self::Output {
         scalar.inv().map(|inv| self * inv)
     }
 }
 
-impl<'a, U, V> DivAssign<ModRingElementRef<'a, V>> for EllipticCurvePoint<'a, U, V>
-where
-    U: UintMont + ConditionallySelectable,
-    V: UintMont + UintExp,
-{
-    fn div_assign(&mut self, scalar: ModRingElementRef<'a, V>) {
+impl<'a, U: UintMont> DivAssign<ModRingElementRef<'a, U>> for EllipticCurvePoint<'a, U> {
+    fn div_assign(&mut self, scalar: ModRingElementRef<'a, U>) {
         *self = self.div(scalar).expect("Element is not invertible");
     }
 }
@@ -404,11 +360,7 @@ where
 /// # Panics
 ///
 /// Panics if the points are not on the same curve
-impl<'a, U, V> ConditionallySelectable for EllipticCurvePoint<'a, U, V>
-where
-    U: UintMont + ConditionallySelectable,
-    V: UintMont + UintExp,
-{
+impl<'a, U: UintMont> ConditionallySelectable for EllipticCurvePoint<'a, U> {
     fn conditional_select(a: &Self, b: &Self, choice: Choice) -> Self {
         assert_eq!(a.curve, b.curve);
         use Coordinates::*;
@@ -441,11 +393,7 @@ where
 /// # Panics
 ///
 /// Panics if the points are not on the same curve
-impl<U, V> ConstantTimeEq for EllipticCurvePoint<'_, U, V>
-where
-    U: UintMont + ConditionallySelectable + ConstantTimeEq,
-    V: UintMont + UintExp,
-{
+impl<U: UintMont> ConstantTimeEq for EllipticCurvePoint<'_, U> {
     fn ct_eq(&self, other: &Self) -> Choice {
         use Coordinates::*;
         assert_eq!(self.curve, other.curve);
@@ -457,13 +405,9 @@ where
     }
 }
 
-impl<'a, U, V> CryptoGroup<'a> for EllipticCurve<U, V>
-where
-    U: 'a + UintMont + ConditionallySelectable,
-    V: 'a + UintMont + UintExp,
-{
-    type BaseElement = EllipticCurvePoint<'a, U, V>;
-    type ScalarElement = ModRingElementRef<'a, V>;
+impl<'a, U: 'a + UintMont> CryptoGroup<'a> for EllipticCurve<U> {
+    type BaseElement = EllipticCurvePoint<'a, U>;
+    type ScalarElement = ModRingElementRef<'a, U>;
 
     fn generator(&'a self) -> Self::BaseElement {
         self.generator()

@@ -15,7 +15,7 @@ pub struct ModRing<Uint: UintMont> {
 
 impl<Uint: UintMont> ModRing<Uint> {
     pub fn from_parameters(modulus: Uint, montgomery_r2: Uint, mod_inv: u64) -> Self {
-        let montgomery_r = Uint::mul_redc(montgomery_r2, Uint::one(), modulus, mod_inv);
+        let montgomery_r = Uint::mul_redc(montgomery_r2, Uint::from_u64(1), modulus, mod_inv);
         let montgomery_r3 = Uint::square_redc(montgomery_r2, modulus, mod_inv);
         Self {
             modulus,

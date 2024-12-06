@@ -2,10 +2,12 @@
 //!
 //! Primarily based on TR-03111.
 
+mod codec;
 pub mod groups;
 pub mod mod_ring;
 mod signature;
 
+pub use codec::Codec;
 use {
     crate::asn1::public_key::SubjectPublicKeyInfo,
     anyhow::{ensure, Result},

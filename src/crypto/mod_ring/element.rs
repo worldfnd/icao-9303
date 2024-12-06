@@ -14,7 +14,7 @@ use {
 };
 
 /// Element of a [`ModRing`].
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy)]
 pub struct ModRingElement<Ring: RingRef> {
     ring:  Ring,
     value: Ring::Uint,
@@ -48,7 +48,7 @@ impl<Ring: RingRef> ModRingElement<Ring> {
     #[inline]
     #[must_use]
     pub fn to_uint(self) -> Ring::Uint {
-        self.ring.mont_mul(self.value, Ring::Uint::one())
+        self.ring.mont_mul(self.value, Ring::Uint::from_u64(1))
     }
 
     #[inline]
@@ -125,23 +125,29 @@ forward_fmt!(
     fmt::UpperHex
 );
 
+impl<Ring: RingRef> PartialEq for ModRingElement<Ring> {
+    fn eq(&self, other: &Self) -> bool {
+        assert_eq!(*self.ring, *other.ring);
+        self.value.ct_eq(&other.value).into()
+    }
+}
+
+impl<Ring: RingRef> Eq for ModRingElement<Ring> {}
+
 impl<Ring: RingRef + Default> Zero for ModRingElement<Ring> {
     fn zero() -> Self {
-        Self::from_montgomery(Ring::default(), Ring::Uint::zero())
+        Self::from_montgomery(Ring::default(), Ring::Uint::from_u64(0))
     }
 
     fn is_zero(&self) -> bool {
-        self.value.is_zero()
-    }
-
-    fn set_zero(&mut self) {
-        self.value.set_zero();
+        *self == Self::zero()
     }
 }
 
 impl<Ring: RingRef + Default> One for ModRingElement<Ring> {
     fn one() -> Self {
-        Self::from_montgomery(Ring::default(), Ring::Uint::zero())
+        let ring = Ring::default();
+        Self::from_montgomery(ring, ring.montgomery_r())
     }
 
     fn is_one(&self) -> bool {
