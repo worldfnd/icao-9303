@@ -2,30 +2,21 @@
 
 use {
     super::{
-        super::mod_ring::{ModRing, ModRingElementRef, RingRefExt, UintExp, UintMont},
+        super::mod_ring::{ModRing, ModRingElementRef, RingRefExt, UintMont},
         mul_group::MulGroup,
         CryptoCoreRng, CryptoGroup,
     },
     anyhow::{ensure, Result},
-    subtle::ConditionallySelectable,
 };
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub struct ModPGroup<U, V>
-where
-    U: UintMont + ConditionallySelectable,
-    V: UintMont + UintExp,
-{
+pub struct ModPGroup<U: UintMont, V: UintMont> {
     base_field:      ModRing<U>,
     scalar_field:    ModRing<V>,
     generator_monty: U,
 }
 
-impl<U, V> ModPGroup<U, V>
-where
-    U: UintMont + ConditionallySelectable,
-    V: UintMont + UintExp,
-{
+impl<U: UintMont, V: UintMont> ModPGroup<U, V> {
     pub fn new(modulus: U, generator: U, order: V) -> Result<Self> {
         ensure!(generator < modulus);
         let base_field = ModRing::from_modulus(modulus);
@@ -61,11 +52,7 @@ where
     }
 }
 
-impl<'s, U, V> CryptoGroup<'s> for ModPGroup<U, V>
-where
-    U: 's + UintMont + ConditionallySelectable,
-    V: 's + UintMont + UintExp,
-{
+impl<'s, U: 's + UintMont, V: 's + UintMont> CryptoGroup<'s> for ModPGroup<U, V> {
     type BaseElement = MulGroup<ModRingElementRef<'s, U>>;
     type ScalarElement = ModRingElementRef<'s, V>;
 

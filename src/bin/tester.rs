@@ -28,21 +28,21 @@ struct Args {
 #[serde(deny_unknown_fields, rename_all = "UPPERCASE")]
 struct Document {
     #[serde(deserialize_with = "deserialize_der")]
-    com: der::Any,
+    com:         der::Any,
     #[serde(default, deserialize_with = "deserialize_der", rename = "CardAccess")]
     card_access: Option<EfCardAccess>,
     #[serde(deserialize_with = "deserialize_der")]
-    dg1: der::Any,
+    dg1:         der::Any,
     #[serde(deserialize_with = "deserialize_der")]
-    dg2: der::Any,
+    dg2:         der::Any,
     #[serde(default, deserialize_with = "deserialize_der")]
-    dg7: Option<der::Any>,
+    dg7:         Option<der::Any>,
     #[serde(default, deserialize_with = "deserialize_der")]
-    dg11: Option<der::Any>,
+    dg11:        Option<der::Any>,
     #[serde(default, deserialize_with = "deserialize_der")]
-    dg14: Option<EfDg14>,
+    dg14:        Option<EfDg14>,
     #[serde(deserialize_with = "deserialize_der")]
-    sod: EfSod,
+    sod:         EfSod,
 }
 
 /// Serde helper to decode DER base64 encoded data.
@@ -94,6 +94,15 @@ fn main() -> Result<()> {
                         cert.tbs_certificate.validity.not_before,
                         cert.tbs_certificate.validity.not_after
                     );
+                    println!(
+                        "   - Signature algorithm: {:?}",
+                        cert.tbs_certificate.signature
+                    );
+                    println!("   - Signature algorithm: {:?}", cert.signature_algorithm);
+                    println!(
+                        "   - Subject pubkey: {:?}",
+                        hex::encode(cert.tbs_certificate.subject_public_key_info.to_der()?)
+                    );
                 }
                 CertificateChoices::Other(cert) => {
                     println!(" - Other certificate: {:?}", cert);
@@ -104,6 +113,15 @@ fn main() -> Result<()> {
 
         // Check signatures
         // TODO: document.sod.verify_signature()?;
+        //
+        println!(
+            " - SOD Signature Algoritm: {:?}",
+            hex::encode(document.sod.signer_info().signature_algorithm.to_der()?)
+        );
+        println!(
+            " - SOD Signature: {:?}",
+            hex::encode(document.sod.signer_info().signature.as_bytes())
+        );
 
         // Get LDS Security Object and it's hash algorithm.
         let lso = document.sod.lds_security_object()?;

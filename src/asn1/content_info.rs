@@ -2,14 +2,17 @@
 //!
 //! See [`cms::content_info::ContentInfo`] for a dynamic version.
 
-use der::{
-    asn1::{ContextSpecific, ContextSpecificRef, ObjectIdentifier},
-    Decode, DecodeValue, Encode, EncodeValue, Error, ErrorKind, Header, Length, Reader, Result,
-    Sequence, Tag, TagMode, TagNumber, Tagged, Writer,
+use {
+    cms::signed_data::SignedData,
+    der::{
+        asn1::{ContextSpecific, ContextSpecificRef, ObjectIdentifier as Oid},
+        Decode, DecodeValue, Encode, EncodeValue, Error, ErrorKind, Header, Length, Reader, Result,
+        Sequence, Tag, TagMode, TagNumber, Tagged, Writer,
+    },
 };
 
 pub trait ContentType: Encode + EncodeValue + Tagged + for<'a> Decode<'a> {
-    const CONTENT_TYPE: ObjectIdentifier;
+    const CONTENT_TYPE: Oid;
 }
 
 /// The `ContentInfo` type is defined in [RFC 5652 Section 3].
@@ -22,12 +25,17 @@ pub trait ContentType: Encode + EncodeValue + Tagged + for<'a> Decode<'a> {
 ///                       &Type({ContentSet}{@contentType})}
 /// ```
 ///
-/// In this implementation `contentType` is provided compile time through the [`ContentType`] trait
-/// and `content` is provided as `.0` of the `ContentInfo` struct.
+/// In this implementation `contentType` is provided compile time through the
+/// [`ContentType`] trait and `content` is provided as `.0` of the `ContentInfo`
+/// struct.
 ///
 /// [RFC 5652 Section 3]: https://www.rfc-editor.org/rfc/rfc5652#section-3
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ContentInfo<T: ContentType>(pub T);
+
+impl ContentType for SignedData {
+    const CONTENT_TYPE: Oid = Oid::new_unwrap("1.2.840.113549.1.7.2");
+}
 
 impl<T: ContentType> Sequence<'_> for ContentInfo<T> {}
 
@@ -36,8 +44,8 @@ impl<T: ContentType> EncodeValue for ContentInfo<T> {
         let content_type_len = T::CONTENT_TYPE.encoded_len()?;
         let content_len = ContextSpecificRef {
             tag_number: TagNumber::N0,
-            tag_mode: TagMode::Explicit,
-            value: &self.0,
+            tag_mode:   TagMode::Explicit,
+            value:      &self.0,
         }
         .encoded_len()?;
         content_type_len + content_len
@@ -47,8 +55,8 @@ impl<T: ContentType> EncodeValue for ContentInfo<T> {
         T::CONTENT_TYPE.encode(writer)?;
         ContextSpecificRef {
             tag_number: TagNumber::N0,
-            tag_mode: TagMode::Explicit,
-            value: &self.0,
+            tag_mode:   TagMode::Explicit,
+            value:      &self.0,
         }
         .encode(writer)
     }
@@ -73,7 +81,7 @@ impl<'a, T: ContentType> DecodeValue<'a> for ContentInfo<T> {
             }
             .ok_or_else(|| {
                 Tag::ContextSpecific {
-                    number: TagNumber::N0,
+                    number:      TagNumber::N0,
                     constructed: false,
                 }
                 .value_error()

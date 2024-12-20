@@ -10,13 +10,14 @@ use {
     ruint::Uint,
 };
 
-/// BSI TR-03111 Codecs
+/// The encodings from BSI TR-03111
+#[derive(Clone, Copy, Debug)]
 pub struct BsiTr031111Codec {
     /// Byte length for uints (defaults to Uint::BYTES).
-    uint_bytes: Option<usize>,
+    pub uint_bytes: Option<usize>,
 
     /// Whether to write Elliptic curve points in compressed form.
-    compressed_points: bool,
+    pub compressed_points: bool,
 }
 
 impl Default for BsiTr031111Codec {
