@@ -14,23 +14,23 @@ pub const CHIP_AUTHENTICATION_OID: Oid = Oid::new_unwrap("0.4.0.127.0.7.2.2.3");
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Sequence)]
 pub struct ChipAuthenticationInfo {
     pub protocol: ChipAuthenticationProtocol,
-    pub version: u64,
-    pub key_id: Option<u64>,
+    pub version:  u64,
+    pub key_id:   Option<u64>,
 }
 
 /// See ICAO 9303-11 9.2.6.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Sequence)]
 pub struct ChipAuthenticationPublicKeyInfo {
-    pub protocol: KeyAgreement,
+    pub protocol:   KeyAgreement,
     pub public_key: SubjectPublicKeyInfo,
-    pub key_id: Option<u64>,
+    pub key_id:     Option<u64>,
 }
 
 /// See ICAO 9303-11 9.2.7.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ChipAuthenticationProtocol {
     pub key_agreement: KeyAgreement,
-    pub cipher: Option<SymmetricCipher>,
+    pub cipher:        Option<SymmetricCipher>,
 }
 
 impl ChipAuthenticationInfo {

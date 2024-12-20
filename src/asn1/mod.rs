@@ -18,16 +18,18 @@ mod digest_algorithm_identifier;
 pub mod emrtd;
 mod ordered_set;
 pub mod public_key_info;
+mod signature_algorithm_identifier;
 
 pub use self::{
     application_tagged::ApplicationTagged,
     content_info::{ContentInfo, ContentType},
     digest_algorithm_identifier::DigestAlgorithmIdentifier,
+    signature_algorithm_identifier::SignatureAlgorithmIdentifier,
 };
 use der::{asn1::ObjectIdentifier as Oid, Any, Sequence, ValueOrd};
 
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord, Sequence, ValueOrd)]
 pub struct AnyAlgorithmIdentifier {
-    pub algorithm: Oid,
+    pub algorithm:  Oid,
     pub parameters: Option<Any>,
 }

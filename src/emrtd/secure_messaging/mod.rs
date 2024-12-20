@@ -38,7 +38,7 @@ pub struct PlainText;
 
 pub struct Encrypted<C: Cipher> {
     cipher: C,
-    ssc: u64,
+    ssc:    u64,
 }
 
 pub fn construct_secure_messaging(
@@ -82,7 +82,7 @@ impl<C: Cipher> SecureMessaging for Encrypted<C> {
 
         // Write header
         let mut papdu = apdu.header.to_vec();
-        papdu[0] |= 0x0C; // Set SM bit
+        papdu[0] |= 0x0c; // Set SM bit
 
         // Placeholder for data length
         papdu.extend_from_slice(if extended_length {
@@ -125,7 +125,7 @@ impl<C: Cipher> SecureMessaging for Encrypted<C> {
 
             // Compute MAC and append to papdu
             let mac = self.cipher.mac(ssc, &message);
-            papdu.push(0x8E);
+            papdu.push(0x8e);
             papdu.push(mac.len() as u8);
             papdu.extend_from_slice(&mac);
         }
@@ -134,7 +134,7 @@ impl<C: Cipher> SecureMessaging for Encrypted<C> {
         if extended_length {
             let len = papdu.len() - 7;
             papdu[5] = (len >> 8) as u8;
-            papdu[6] = (len & 0xFF) as u8;
+            papdu[6] = (len & 0xff) as u8;
         } else {
             papdu[4] = (papdu.len() - 5) as u8;
         }
@@ -156,7 +156,7 @@ impl<C: Cipher> SecureMessaging for Encrypted<C> {
 
         // Split off DO'8E object containing MAC
         let (resp, mac) = resp.split_at(resp.len() - 10);
-        ensure_err!(mac[0] == 0x8E, Error::SMResponseInvalid);
+        ensure_err!(mac[0] == 0x8e, Error::SMResponseInvalid);
         ensure_err!(mac[1] == 0x08, Error::SMResponseInvalid);
         let mac = &mac[2..];
 
@@ -189,7 +189,7 @@ impl<C: Cipher> SecureMessaging for Encrypted<C> {
         ensure_err!(resp[0] == 0x85 || resp[0] == 0x87, Error::SMResponseInvalid);
         // Parse BER-TLV length
         let (tl_len, length) = match resp[1] {
-            0x00..=0x7F => (2, resp[1] as usize),
+            0x00..=0x7f => (2, resp[1] as usize),
             0x81 => (3, resp[2] as usize),
             0x82 => (4, u16::from_be_bytes([resp[2], resp[3]]) as usize),
             0x83 => (

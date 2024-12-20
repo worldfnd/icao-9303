@@ -82,7 +82,7 @@ impl<'a> DecodeValue<'a> for PubkeyAlgorithmIdentifier {
             ID_EC => Self::Ec(ECAlgoParameters::decode(reader)?),
             ID_DH => Self::Dh(DhAlgoParameters::decode(reader)?),
             _ => Self::Unknown(AnyAlgorithmIdentifier {
-                algorithm: oid,
+                algorithm:  oid,
                 parameters: Option::<Any>::decode(reader)?,
             }),
         })

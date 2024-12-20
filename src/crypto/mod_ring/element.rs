@@ -16,7 +16,7 @@ use {
 /// Element of a [`ModRing`].
 #[derive(Clone, Copy)]
 pub struct ModRingElement<Ring: RingRef> {
-    ring: Ring,
+    ring:  Ring,
     value: Ring::Uint,
 }
 

@@ -55,8 +55,9 @@ fn main() -> Result<()> {
     // Active Authentication with fixed nonce
     // // ICAO 9303-11 section 6.1
     // eprintln!("=== Active Authentication");
-    // let (_status, data) = card.send_apdu(&hex!("00 88 0000  08  00 01 02 03 04 05 06 07  00"))?;
-    // println!("==> Active Authentication: {}", hex::encode(data));
+    // let (_status, data) = card.send_apdu(&hex!("00 88 0000  08  00 01 02 03 04 05
+    // 06 07  00"))?; println!("==> Active Authentication: {}",
+    // hex::encode(data));
 
     // Dump SOD
     let sod: EfSod = card.read_cached()?;

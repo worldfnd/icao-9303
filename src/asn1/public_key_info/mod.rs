@@ -20,21 +20,22 @@ pub enum SubjectPublicKeyInfo {
 
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord, Sequence, ValueOrd)]
 pub struct AnySubjectPublicKeyInfo {
-    pub algorithm: AnyAlgorithmIdentifier,
+    pub algorithm:          AnyAlgorithmIdentifier,
     pub subject_public_key: BitString,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord, Sequence, ValueOrd)]
 pub struct RsaPublicKeyInfo {
-    pub modulus: Int,
-    pub public_exponent: Int,
+    pub subject_public_key: BitString,
+    // pub modulus: Int,
+    // pub public_exponent: Int,
 }
 
 /// Diffie-Hellman Mod-P Group Parameters.
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord, Sequence, ValueOrd)]
 pub struct DhAlgoParameters {
-    pub prime: Int,
-    pub base: Int,
+    pub prime:                Int,
+    pub base:                 Int,
     pub private_value_length: Option<u64>,
 }
 
@@ -55,18 +56,18 @@ pub enum ECAlgoParameters {
 
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord, Sequence, ValueOrd)]
 pub struct EcParameters {
-    pub version: u64,
+    pub version:  u64,
     pub field_id: FieldId,
-    pub curve: Curve,
-    pub base: ECPoint,
-    pub order: Int,
+    pub curve:    Curve,
+    pub base:     ECPoint,
+    pub order:    Int,
     pub cofactor: Option<Int>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord, Sequence, ValueOrd)]
 pub struct Curve {
-    pub a: FieldElement,
-    pub b: FieldElement,
+    pub a:    FieldElement,
+    pub b:    FieldElement,
     pub seed: Option<BitString>,
 }
 
@@ -77,8 +78,8 @@ pub type ECPoint = OctetString;
 impl SubjectPublicKeyInfo {
     pub fn bit_len(&self) -> usize {
         match self {
-            Self::Rsa(info) => info.modulus.as_bytes().len() * 8,
-            Self::Unknown(_) => todo!(),
+            Self::Rsa(info) => info.subject_public_key.bit_len(),
+            Self::Unknown(info) => info.subject_public_key.bit_len(),
         }
     }
 }
@@ -104,7 +105,7 @@ impl EncodeValue for SubjectPublicKeyInfo {
 
     fn encode_value(&self, writer: &mut impl Writer) -> Result<()> {
         match self {
-            Self::Rsa(info) => todo!(),
+            Self::Rsa(_info) => todo!(),
             Self::Unknown(any) => any.encode(writer),
         }
     }
@@ -112,8 +113,14 @@ impl EncodeValue for SubjectPublicKeyInfo {
 
 impl<'a> DecodeValue<'a> for SubjectPublicKeyInfo {
     fn decode_value<R: Reader<'a>>(reader: &mut R, _header: der::Header) -> Result<Self> {
-        let oid = Oid::decode(reader)?;
-        Ok(match oid {
+        let algo = PubkeyAlgorithmIdentifier::decode(reader)?;
+        let subject_public_key = BitString::decode(reader)?;
+        Ok(match algo {
+            PubkeyAlgorithmIdentifier::Rsa => Self::Rsa(RsaPublicKeyInfo { subject_public_key }),
+            PubkeyAlgorithmIdentifier::Unknown(id) => Self::Unknown(AnySubjectPublicKeyInfo {
+                algorithm: id,
+                subject_public_key,
+            }),
             _ => todo!(),
         })
     }

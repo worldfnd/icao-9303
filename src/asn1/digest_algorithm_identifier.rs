@@ -153,7 +153,7 @@ fn hash<D: Digest>(data: &[u8]) -> Vec<u8> {
 impl From<&DigestAlgorithmIdentifier> for AnyAlgorithmIdentifier {
     fn from(digest: &DigestAlgorithmIdentifier) -> Self {
         AnyAlgorithmIdentifier {
-            algorithm: digest.oid(),
+            algorithm:  digest.oid(),
             parameters: digest.parameters(),
         }
     }
@@ -169,7 +169,7 @@ impl TryFrom<AnyAlgorithmIdentifier> for DigestAlgorithmIdentifier {
             Some(any) => Err(Error::new(
                 ErrorKind::TagUnexpected {
                     expected: Some(Tag::Null),
-                    actual: any.tag(),
+                    actual:   any.tag(),
                 },
                 Length::ZERO,
             )),

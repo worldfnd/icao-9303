@@ -274,7 +274,10 @@ mod tests {
 
         // 8.1
         let apdu = hex!("00 22 81 B6 11 83 0F 44 45 54 45 53 54 43 56 43 41 30 30 30 30 33");
-        let papdu = hex!("0C 22 81 B6 2D 87 21 01 B3 7B B5 7D A1 DB 37 D1 C4 96 04 91 7B D6 99 E6 1D 6A 30 74 E6 9E 40 67 A1 B3 99 03 88 23 36 33 8E 08 F3 65 26 DE 03 A3 1A 19 00");
+        let papdu = hex!(
+            "0C 22 81 B6 2D 87 21 01 B3 7B B5 7D A1 DB 37 D1 C4 96 04 91 7B D6 99 E6 1D 6A 30 74 \
+             E6 9E 40 67 A1 B3 99 03 88 23 36 33 8E 08 F3 65 26 DE 03 A3 1A 19 00"
+        );
         let result = sm.enc_apdu(&apdu).unwrap();
         eprintln!("RES: {}", hex::encode(&result));
         eprintln!("COR: {}", hex::encode(&papdu));

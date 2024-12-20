@@ -109,8 +109,8 @@ impl Emrtd {
             .nfc
             .send_apdu(&protected_apdu)
             .map_err(Error::NfcError)?;
-        //eprintln!("Status word: {}", status);
-        //eprintln!("Encrypted response APDU: {}", hex::encode(&data));
+        // eprintln!("Status word: {}", status);
+        // eprintln!("Encrypted response APDU: {}", hex::encode(&data));
 
         match status {
             StatusWord::SECURE_MESSAGING_INCORRECT | StatusWord::SECURE_MESSAGING_INCOMPLETE => {

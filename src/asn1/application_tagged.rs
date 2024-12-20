@@ -12,7 +12,7 @@ impl<const APPLICATION: u8, T: for<'a> DecodeValue<'a>> FixedTag
 {
     const TAG: Tag = Tag::Application {
         constructed: true,
-        number: TagNumber::new(APPLICATION),
+        number:      TagNumber::new(APPLICATION),
     };
 }
 

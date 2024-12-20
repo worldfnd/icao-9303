@@ -14,17 +14,17 @@ use {
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct EllipticCurve<U: UintMont> {
-    base_field: ModRing<U>,
-    scalar_field: ModRing<U>,
-    a_monty: U,
-    b_monty: U,
-    cofactor: U,
+    base_field:      ModRing<U>,
+    scalar_field:    ModRing<U>,
+    a_monty:         U,
+    b_monty:         U,
+    cofactor:        U,
     generator_monty: (U, U),
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct EllipticCurvePoint<'a, U: UintMont> {
-    curve: &'a EllipticCurve<U>,
+    curve:       &'a EllipticCurve<U>,
     coordinates: Coordinates<'a, U>,
 }
 
@@ -113,7 +113,7 @@ impl<U: UintMont> EllipticCurve<U> {
 
     pub fn generator(&self) -> EllipticCurvePoint<'_, U> {
         EllipticCurvePoint {
-            curve: self,
+            curve:       self,
             coordinates: Coordinates::Affine(
                 self.base_field.from_montgomery(self.generator_monty.0),
                 self.base_field.from_montgomery(self.generator_monty.1),
@@ -124,7 +124,7 @@ impl<U: UintMont> EllipticCurve<U> {
     /// Point at infinity
     pub const fn infinity(&self) -> EllipticCurvePoint<'_, U> {
         EllipticCurvePoint {
-            curve: self,
+            curve:       self,
             coordinates: Coordinates::Infinity,
         }
     }
@@ -136,7 +136,7 @@ impl<U: UintMont> EllipticCurve<U> {
     ) -> Result<EllipticCurvePoint<'a, U>> {
         self.ensure_valid(x, y)?;
         Ok(EllipticCurvePoint {
-            curve: self,
+            curve:       self,
             coordinates: Coordinates::Affine(x, y),
         })
     }
@@ -148,7 +148,7 @@ impl<U: UintMont> EllipticCurve<U> {
         let y2 = x.pow(3) + self.a() * x + self.b();
         let y = y2.sqrt()?;
         Some(EllipticCurvePoint {
-            curve: self,
+            curve:       self,
             coordinates: Coordinates::Affine(x, y),
         })
     }
@@ -182,7 +182,7 @@ impl<U: UintMont> EllipticCurve<U> {
 
         if self.cofactor() != U::from_u64(1) {
             let point = EllipticCurvePoint {
-                curve: self,
+                curve:       self,
                 coordinates: Coordinates::Affine(x, y),
             };
             ensure!(
@@ -290,7 +290,7 @@ impl<U: UintMont> Add for EllipticCurvePoint<'_, U> {
                         let x3 = lambda.pow(2) - self.curve.base_field.from_u64(2) * x1;
                         let y3 = lambda * (x1 - x3) - y1;
                         EllipticCurvePoint {
-                            curve: self.curve,
+                            curve:       self.curve,
                             coordinates: Coordinates::Affine(x3, y3),
                         }
                     } else {
@@ -322,7 +322,7 @@ impl<U: UintMont> Neg for EllipticCurvePoint<'_, U> {
         match self.coordinates {
             Coordinates::Infinity => self,
             Coordinates::Affine(x, y) => EllipticCurvePoint {
-                curve: self.curve,
+                curve:       self.curve,
                 coordinates: Coordinates::Affine(x, -y),
             },
         }

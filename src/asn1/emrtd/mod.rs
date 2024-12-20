@@ -6,13 +6,11 @@ use {
     },
     super::{ApplicationTagged, ContentInfo, ContentType, DigestAlgorithmIdentifier},
     crate::ensure_err,
-    cms::signed_data::SignedData,
-    cms::signed_data::{EncapsulatedContentInfo, SignerInfo},
+    cms::signed_data::{EncapsulatedContentInfo, SignedData, SignerInfo},
     der::{
         asn1::{ObjectIdentifier as Oid, OctetString, PrintableString},
-        Sequence,
+        Decode, Error, ErrorKind, Length, Result, Sequence, Tag,
     },
-    der::{Decode, Error, ErrorKind, Length, Result, Tag},
     security_info::{ChipAuthenticationProtocol, KeyAgreement, SymmetricCipher},
 };
 
@@ -35,16 +33,16 @@ pub type EfSod = ApplicationTagged<23, ContentInfo<SignedData>>;
 /// ICAO-9303-10 4.6.2.3
 #[derive(Clone, Debug, PartialEq, Eq, Sequence)]
 pub struct LdsSecurityObject {
-    pub version: u64,
-    pub hash_algorithm: DigestAlgorithmIdentifier,
+    pub version:                u64,
+    pub hash_algorithm:         DigestAlgorithmIdentifier,
     pub data_group_hash_values: Vec<DataGroupHash>,
-    pub lds_version_info: Option<LdsVersionInfo>,
+    pub lds_version_info:       Option<LdsVersionInfo>,
 }
 
 /// ICAO-9303-10 4.6.2.3
 #[derive(Clone, Debug, PartialEq, Eq, Sequence)]
 pub struct LdsVersionInfo {
-    pub lds_version: PrintableString,
+    pub lds_version:     PrintableString,
     pub unicode_version: PrintableString,
 }
 
@@ -52,7 +50,7 @@ pub struct LdsVersionInfo {
 #[derive(Clone, Debug, PartialEq, Eq, Sequence)]
 pub struct DataGroupHash {
     pub data_group_number: u64,
-    pub hash_value: OctetString,
+    pub hash_value:        OctetString,
 }
 
 impl ContentType for LdsSecurityObject {
@@ -79,10 +77,10 @@ impl EfDg14 {
                 &ChipAuthenticationInfo {
                     protocol: ChipAuthenticationProtocol {
                         key_agreement: KeyAgreement::Ecdh, // TODO: From pubkey
-                        cipher: Some(SymmetricCipher::Tdes),
+                        cipher:        Some(SymmetricCipher::Tdes),
                     },
-                    version: 1,
-                    key_id: None,
+                    version:  1,
+                    key_id:   None,
                 },
             );
         // Do some verification checks
@@ -147,7 +145,7 @@ impl EfSod {
             .ok_or(Error::new(
                 ErrorKind::TagUnexpected {
                     expected: Some(Tag::OctetString),
-                    actual: Tag::Null, // Actually None
+                    actual:   Tag::Null, // Actually None
                 },
                 Length::ZERO,
             ))?

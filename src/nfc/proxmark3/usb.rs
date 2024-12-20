@@ -10,10 +10,10 @@ const PROXMARK3_PRODUCT_ID: u16 = 0x4b8f;
 const TIMEOUT: Duration = Duration::from_secs(3);
 
 pub struct UsbConnection {
-    handle: DeviceHandle<GlobalContext>,
-    bulk_in_endpoint: u8,
+    handle:            DeviceHandle<GlobalContext>,
+    bulk_in_endpoint:  u8,
     bulk_out_endpoint: u8,
-    buffer: Vec<u8>,
+    buffer:            Vec<u8>,
 }
 
 impl UsbConnection {

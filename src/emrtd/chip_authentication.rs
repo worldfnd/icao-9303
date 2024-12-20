@@ -11,7 +11,9 @@ use {
 
 impl Emrtd {
     pub fn chip_authenticate(&mut self, mut rng: impl CryptoRng + RngCore) -> Result<()> {
-        // TODO: Some passports only have ChipAuthenticationPublicKeyInfo but no ChipAuthenticationInfo. In this case, CA_(EC)DH_3DES_CBC_CBC should be assumed.
+        // TODO: Some passports only have ChipAuthenticationPublicKeyInfo but no
+        // ChipAuthenticationInfo. In this case, CA_(EC)DH_3DES_CBC_CBC should be
+        // assumed.
 
         // Read EF.DG14
         let ef_dg14 = self.read_cached::<EfDg14>()?;
@@ -51,7 +53,7 @@ impl Emrtd {
 
     pub fn mset_at(&mut self, protocol: Oid, key_id: Option<u64>) -> Result<()> {
         // Send MSE Set AT to select the Chip Authentication protocol.
-        let mut apdu = vec![0x00, 0x22, 0x41, 0xA4];
+        let mut apdu = vec![0x00, 0x22, 0x41, 0xa4];
         apdu.push(0x00); // Placeholder length
 
         // Cryptographic mechanism: 0x80 <len> <OID>
@@ -81,7 +83,7 @@ impl Emrtd {
         // Send General Authenticate command to chip
         let mut apdu = vec![0x00, 0x86, 0x00, 0x00];
         apdu.push((public_key.len() + 4).try_into()?);
-        apdu.push(0x7C);
+        apdu.push(0x7c);
         apdu.push((public_key.len() + 2).try_into()?);
         apdu.push(0x80);
         apdu.push(public_key.len().try_into()?);

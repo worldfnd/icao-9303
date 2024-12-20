@@ -19,30 +19,30 @@ use {
 pub enum Command {
     DebugPrintString = 0x0100, // Used for error responses.
 
-    NotAck = 0x00FE,
-    Ack = 0x00FF,
+    NotAck           = 0x00fe,
+    Ack              = 0x00ff,
 
-    Ping = 0x0109,
-    Capabilities = 0x0112,
-    Version = 0x0107,
-    QuitSession = 0x0113,
+    Ping             = 0x0109,
+    Capabilities     = 0x0112,
+    Version          = 0x0107,
+    QuitSession      = 0x0113,
 
-    Hf14aReader = 0x0385,
-    Hf14bReader = 0x0305,
+    Hf14aReader      = 0x0385,
+    Hf14bReader      = 0x0305,
 }
 
 #[repr(i16)]
 pub enum Status {
-    Success = 0,
-    UndefinedError = -1,
-    InvalidArgument = -2,
+    Success            = 0,
+    UndefinedError     = -1,
+    InvalidArgument    = -2,
     CardExchangeFailed = -18,
 }
 
 pub struct Proxmark3 {
-    connection: Box<dyn Connection>,
-    crc: bool,
-    trace: bool,
+    connection:   Box<dyn Connection>,
+    crc:          bool,
+    trace:        bool,
     current_card: Option<CardType>,
 }
 
@@ -137,7 +137,8 @@ impl Proxmark3 {
         }
         ensure!(response.len() == 271);
         ensure!(arg0 == 1);
-        // TODO: arg0 == 2 means no ATS included and will have to be requested separately.
+        // TODO: arg0 == 2 means no ATS included and will have to be requested
+        // separately.
         let (uid, mut response) = response.split_at(10);
         let uid_len = response.get_u8();
         let uid = &uid[..uid_len as usize];
@@ -303,7 +304,7 @@ impl Proxmark3 {
         let mut header = &header[..];
         ensure!(header.get_u32_le() == 0x62334d50); // magic
         let len = header.get_u16_le();
-        let (len, _ng) = (len & 0x7FFF, len & 0x8000 != 0);
+        let (len, _ng) = (len & 0x7fff, len & 0x8000 != 0);
         ensure!(len <= 512);
         let status = header.get_i16_le();
         let cmd = header.get_u16_le();

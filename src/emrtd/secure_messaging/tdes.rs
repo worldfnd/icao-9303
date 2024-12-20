@@ -78,10 +78,11 @@ fn kdf(seed: &[u8], counter: u32) -> [u8; 16] {
     key
 }
 
-/// DES keys use only 7 bits per byte, with the least significant bit used for parity.
+/// DES keys use only 7 bits per byte, with the least significant bit used for
+/// parity.
 fn set_parity_bits(key: &mut [u8]) {
     for byte in key {
-        *byte &= 0xFE;
+        *byte &= 0xfe;
         *byte |= 1 ^ (byte.count_ones() as u8 & 1);
     }
 }
@@ -179,7 +180,7 @@ mod tests {
     #[test]
     fn test_tdes_sm() {
         let seed = hex!("0036D272F5C350ACAC50C3F572D23600");
-        let ssc = 0x887022120C06C226;
+        let ssc = 0x887022120c06c226;
         let mut tdes = Encrypted::new(TDesCipher::from_seed(&seed[..]), ssc);
 
         // Select EF.COM

@@ -44,8 +44,8 @@ impl<T: ContentType> EncodeValue for ContentInfo<T> {
         let content_type_len = T::CONTENT_TYPE.encoded_len()?;
         let content_len = ContextSpecificRef {
             tag_number: TagNumber::N0,
-            tag_mode: TagMode::Explicit,
-            value: &self.0,
+            tag_mode:   TagMode::Explicit,
+            value:      &self.0,
         }
         .encoded_len()?;
         content_type_len + content_len
@@ -55,8 +55,8 @@ impl<T: ContentType> EncodeValue for ContentInfo<T> {
         T::CONTENT_TYPE.encode(writer)?;
         ContextSpecificRef {
             tag_number: TagNumber::N0,
-            tag_mode: TagMode::Explicit,
-            value: &self.0,
+            tag_mode:   TagMode::Explicit,
+            value:      &self.0,
         }
         .encode(writer)
     }
@@ -81,7 +81,7 @@ impl<'a, T: ContentType> DecodeValue<'a> for ContentInfo<T> {
             }
             .ok_or_else(|| {
                 Tag::ContextSpecific {
-                    number: TagNumber::N0,
+                    number:      TagNumber::N0,
                     constructed: false,
                 }
                 .value_error()
