@@ -11,7 +11,7 @@ use {
 };
 
 pub struct RSAPublicKey<U: UintMont> {
-    ring:            ModRing<U>,
+    ring: ModRing<U>,
     public_exponent: U,
 }
 
@@ -34,7 +34,7 @@ impl<U: UintMont> RSAPublicKey<U> {
 
 #[cfg(test)]
 mod tests {
-    use {crate::asn1::public_key::SubjectPublicKeyInfo, der::Decode, hex_literal::hex};
+    use {crate::asn1::public_key_info::SubjectPublicKeyInfo, der::Decode, hex_literal::hex};
 
     #[test]
     fn test_rsa_assa_pss() {

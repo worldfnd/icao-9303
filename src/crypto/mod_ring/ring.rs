@@ -7,10 +7,10 @@ pub struct ModRing<Uint: UintMont> {
     modulus: Uint,
 
     // Precomputed values for Montgomery multiplication.
-    montgomery_r:  Uint, // R = 2^64*LIMBS mod modulus
+    montgomery_r: Uint,  // R = 2^64*LIMBS mod modulus
     montgomery_r2: Uint, // R^2, or R in Montgomery form
     montgomery_r3: Uint, // R^3, or R^2 in Montgomery form
-    mod_inv:       u64,  // -1 / modulus mod 2^64
+    mod_inv: u64,        // -1 / modulus mod 2^64
 }
 
 impl<Uint: UintMont> ModRing<Uint> {

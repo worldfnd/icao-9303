@@ -1,7 +1,7 @@
 use {
     super::Emrtd,
     crate::{
-        asn1::{security_info::SymmetricCipher, EfDg14},
+        asn1::emrtd::{security_info::SymmetricCipher, EfDg14},
         emrtd::secure_messaging::construct_secure_messaging,
     },
     anyhow::{ensure, Result},

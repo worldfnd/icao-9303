@@ -1,6 +1,6 @@
 use {
     super::Emrtd,
-    crate::{asn1::public_key::EcParameters, emrtd::secure_messaging::aes::kdf_128},
+    crate::{asn1::public_key_info::EcParameters, emrtd::secure_messaging::aes::kdf_128},
     anyhow::Result,
     rand::{CryptoRng, RngCore},
     sha1::{Digest, Sha1},

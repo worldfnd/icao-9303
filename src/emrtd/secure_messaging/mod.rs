@@ -10,7 +10,7 @@ use {
     },
     super::{pad, Error, Result},
     crate::{
-        asn1::security_info::SymmetricCipher,
+        asn1::emrtd::security_info::SymmetricCipher,
         ensure_err,
         iso7816::{parse_apdu, StatusWord},
     },

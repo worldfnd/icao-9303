@@ -1,7 +1,7 @@
 //! Signature verification for SOD
 
 use {
-    crate::asn1::{DigestAlgorithmIdentifier, EfSod},
+    crate::asn1::{emrtd::EfSod, DigestAlgorithmIdentifier},
     anyhow::Result,
     der::{Decode, Encode},
 };

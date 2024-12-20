@@ -9,7 +9,7 @@ use {
     glob::{glob, Pattern},
     hex_literal::hex,
     icao_9303::{
-        asn1::{EfCardAccess, EfDg14, EfSod},
+        asn1::emrtd::{EfCardAccess, EfDg14, EfSod},
         emrtd::secure_messaging::construct_secure_messaging,
     },
     serde::{Deserialize, Deserializer},
@@ -28,21 +28,21 @@ struct Args {
 #[serde(deny_unknown_fields, rename_all = "UPPERCASE")]
 struct Document {
     #[serde(deserialize_with = "deserialize_der")]
-    com:         der::Any,
+    com: der::Any,
     #[serde(default, deserialize_with = "deserialize_der", rename = "CardAccess")]
     card_access: Option<EfCardAccess>,
     #[serde(deserialize_with = "deserialize_der")]
-    dg1:         der::Any,
+    dg1: der::Any,
     #[serde(deserialize_with = "deserialize_der")]
-    dg2:         der::Any,
+    dg2: der::Any,
     #[serde(default, deserialize_with = "deserialize_der")]
-    dg7:         Option<der::Any>,
+    dg7: Option<der::Any>,
     #[serde(default, deserialize_with = "deserialize_der")]
-    dg11:        Option<der::Any>,
+    dg11: Option<der::Any>,
     #[serde(default, deserialize_with = "deserialize_der")]
-    dg14:        Option<EfDg14>,
+    dg14: Option<EfDg14>,
     #[serde(deserialize_with = "deserialize_der")]
-    sod:         EfSod,
+    sod: EfSod,
 }
 
 /// Serde helper to decode DER base64 encoded data.

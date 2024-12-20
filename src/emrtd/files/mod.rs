@@ -4,7 +4,7 @@ pub use self::file_id::{DedicatedId, FileId};
 use {
     super::{Emrtd, Error, Result},
     crate::{
-        asn1::{EfCardAccess, EfDg14, EfSod},
+        asn1::emrtd::{EfCardAccess, EfDg14, EfSod},
         ensure_err,
         iso7816::StatusWord,
     },

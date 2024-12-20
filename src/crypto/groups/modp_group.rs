@@ -11,8 +11,8 @@ use {
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct ModPGroup<U: UintMont, V: UintMont> {
-    base_field:      ModRing<U>,
-    scalar_field:    ModRing<V>,
+    base_field: ModRing<U>,
+    scalar_field: ModRing<V>,
     generator_monty: U,
 }
 

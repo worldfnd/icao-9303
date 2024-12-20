@@ -3,7 +3,7 @@
 use {
     anyhow::{anyhow, Context, Result},
     icao_9303::{
-        asn1::EfSod,
+        asn1::emrtd::EfSod,
         emrtd::{Emrtd, Error, FileId},
         ensure_err,
         iso7816::StatusWord,

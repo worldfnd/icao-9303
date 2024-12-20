@@ -48,10 +48,10 @@ impl Default for Icao9303Codec {
     fn default() -> Self {
         Self {
             non_minimal_length: Leniency::Warn,
-            leading_zeros:      Leniency::Warn,
-            read_order:         Leniency::Warn,
-            unknown_tag:        Leniency::Strict,
-            missing_cofactor:   Leniency::Warn,
+            leading_zeros: Leniency::Warn,
+            read_order: Leniency::Warn,
+            unknown_tag: Leniency::Strict,
+            missing_cofactor: Leniency::Warn,
         }
     }
 }
@@ -59,16 +59,16 @@ impl Default for Icao9303Codec {
 pub struct BerSize(usize);
 
 pub struct PublicKeyRSA<U> {
-    oid:             ObjectIdentifier,
-    modulus:         U,
+    oid: ObjectIdentifier,
+    modulus: U,
     public_exponent: U,
 }
 
 pub struct PublicKeyDH<U, V> {
-    oid:        ObjectIdentifier,
-    modulus:    U,
-    order:      V,
-    generator:  U,
+    oid: ObjectIdentifier,
+    modulus: U,
+    order: V,
+    generator: U,
     public_key: U,
 }
 

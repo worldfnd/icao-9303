@@ -23,7 +23,7 @@ pub struct BsiTr031111Codec {
 impl Default for BsiTr031111Codec {
     fn default() -> Self {
         Self {
-            uint_bytes:        None,
+            uint_bytes: None,
             compressed_points: true,
         }
     }

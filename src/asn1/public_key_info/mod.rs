@@ -2,9 +2,14 @@ mod field_id;
 mod pubkey_algorithm_identifier;
 
 pub use self::{field_id::FieldId, pubkey_algorithm_identifier::PubkeyAlgorithmIdentifier};
-use der::{
-    asn1::{BitString, Int, Null, ObjectIdentifier as Oid, OctetString},
-    Choice, Sequence, ValueOrd,
+use {
+    crate::asn1::AnyAlgorithmIdentifier,
+    der::{
+        asn1::{BitString, Int, Null, ObjectIdentifier as Oid, OctetString},
+        Choice, Decode, DecodeValue, Encode, EncodeValue, Length, Reader, Result, Sequence,
+        ValueOrd, Writer,
+    },
+    std::cmp::Ordering,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
@@ -15,21 +20,21 @@ pub enum SubjectPublicKeyInfo {
 
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord, Sequence, ValueOrd)]
 pub struct AnySubjectPublicKeyInfo {
-    pub algorithm:          AnyAlgorithmIdentifier,
+    pub algorithm: AnyAlgorithmIdentifier,
     pub subject_public_key: BitString,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord, Sequence, ValueOrd)]
 pub struct RsaPublicKeyInfo {
-    pub modulus:         Int,
+    pub modulus: Int,
     pub public_exponent: Int,
 }
 
 /// Diffie-Hellman Mod-P Group Parameters.
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord, Sequence, ValueOrd)]
 pub struct DhAlgoParameters {
-    pub prime:                Int,
-    pub base:                 Int,
+    pub prime: Int,
+    pub base: Int,
     pub private_value_length: Option<u64>,
 }
 
@@ -50,24 +55,33 @@ pub enum ECAlgoParameters {
 
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord, Sequence, ValueOrd)]
 pub struct EcParameters {
-    pub version:  u64,
+    pub version: u64,
     pub field_id: FieldId,
-    pub curve:    Curve,
-    pub base:     ECPoint,
-    pub order:    Int,
+    pub curve: Curve,
+    pub base: ECPoint,
+    pub order: Int,
     pub cofactor: Option<Int>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord, Sequence, ValueOrd)]
 pub struct Curve {
-    pub a:    FieldElement,
-    pub b:    FieldElement,
+    pub a: FieldElement,
+    pub b: FieldElement,
     pub seed: Option<BitString>,
 }
 
 pub type FieldElement = OctetString;
 
 pub type ECPoint = OctetString;
+
+impl SubjectPublicKeyInfo {
+    pub fn bit_len(&self) -> usize {
+        match self {
+            Self::Rsa(info) => info.modulus.as_bytes().len() * 8,
+            Self::Unknown(_) => todo!(),
+        }
+    }
+}
 
 impl Sequence<'_> for SubjectPublicKeyInfo {}
 
@@ -80,49 +94,27 @@ impl ValueOrd for SubjectPublicKeyInfo {
     }
 }
 
-impl EncodeValue for PubkeyAlgorithmIdentifier {
+impl EncodeValue for SubjectPublicKeyInfo {
     fn value_len(&self) -> Result<Length> {
         match self {
-            Self::Rsa => ID_RSA.encoded_len() + Null.encoded_len()?,
-            Self::Ec(params) => ID_EC.encoded_len()? + params.encoded_len()?,
-            Self::Dh(params) => ID_DH.encoded_len()? + params.encoded_len()?,
-            Self::Unknown(any) => any.value_len(),
+            Self::Rsa(_info) => todo!(),
+            Self::Unknown(info) => info.value_len(),
         }
     }
 
     fn encode_value(&self, writer: &mut impl Writer) -> Result<()> {
         match self {
-            Self::Rsa => {
-                ID_RSA.encode(writer)?;
-                Null.encode(writer)
-            }
-            Self::Ec(params) => {
-                ID_EC.encode(writer)?;
-                params.encode(writer)
-            }
-            Self::Dh(params) => {
-                ID_DH.encode(writer)?;
-                params.encode(writer)
-            }
+            Self::Rsa(info) => todo!(),
             Self::Unknown(any) => any.encode(writer),
         }
     }
 }
 
-impl<'a> DecodeValue<'a> for PubkeyAlgorithmIdentifier {
+impl<'a> DecodeValue<'a> for SubjectPublicKeyInfo {
     fn decode_value<R: Reader<'a>>(reader: &mut R, _header: der::Header) -> Result<Self> {
         let oid = Oid::decode(reader)?;
         Ok(match oid {
-            ID_RSA => {
-                Null::decode(reader)?;
-                Self::Rsa
-            }
-            ID_EC => Self::Ec(ECAlgoParameters::decode(reader)?),
-            ID_DH => Self::Dh(DhAlgoParameters::decode(reader)?),
-            _ => Self::Unknown(AnyAlgorithmIdentifier {
-                algorithm:  oid,
-                parameters: Option::<Any>::decode(reader)?,
-            }),
+            _ => todo!(),
         })
     }
 }

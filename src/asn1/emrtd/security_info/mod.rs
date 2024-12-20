@@ -8,8 +8,7 @@ pub use {
     },
 };
 use {
-    super::ordered_set::OrderedSet,
-    crate::ensure_err,
+    crate::{asn1::ordered_set::OrderedSet, ensure_err},
     der::{
         asn1::{ObjectIdentifier as Oid, OctetString},
         Any, Decode, DecodeValue, Encode, EncodeValue, Error, ErrorKind, FixedTag, Header, Length,

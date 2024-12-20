@@ -1,6 +1,6 @@
 use {
-    super::{super::public_key::SubjectPublicKeyInfo, KeyAgreement, SymmetricCipher},
-    crate::ensure_err,
+    super::{KeyAgreement, SymmetricCipher},
+    crate::{asn1::public_key_info::SubjectPublicKeyInfo, ensure_err},
     der::{
         asn1::ObjectIdentifier as Oid, DecodeValue, EncodeValue, Error, ErrorKind, FixedTag,
         Header, Length, Reader, Result, Sequence, Tag, Writer,
@@ -56,7 +56,7 @@ impl Display for ChipAuthenticationPublicKeyInfo {
             f,
             "CA-PUBKEY-{}-{}",
             self.protocol,
-            self.public_key.subject_public_key.bit_len()
+            self.public_key.bit_len()
         )
     }
 }
