@@ -5,6 +5,7 @@
 mod codec;
 pub mod groups;
 pub mod mod_ring;
+mod rsa;
 mod signature;
 
 pub use codec::Codec;
