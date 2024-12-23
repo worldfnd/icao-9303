@@ -26,9 +26,9 @@ pub struct AnySubjectPublicKeyInfo {
 
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord, Sequence, ValueOrd)]
 pub struct RsaPublicKeyInfo {
-    pub subject_public_key: BitString,
-    // pub modulus: Int,
-    // pub public_exponent: Int,
+    // pub subject_public_key: BitString,
+    pub modulus:         Int,
+    pub public_exponent: Int,
 }
 
 /// Diffie-Hellman Mod-P Group Parameters.
@@ -78,7 +78,7 @@ pub type ECPoint = OctetString;
 impl SubjectPublicKeyInfo {
     pub fn bit_len(&self) -> usize {
         match self {
-            Self::Rsa(info) => info.subject_public_key.bit_len(),
+            Self::Rsa(info) => todo!(),
             Self::Unknown(info) => info.subject_public_key.bit_len(),
         }
     }
@@ -116,7 +116,12 @@ impl<'a> DecodeValue<'a> for SubjectPublicKeyInfo {
         let algo = PubkeyAlgorithmIdentifier::decode(reader)?;
         let subject_public_key = BitString::decode(reader)?;
         Ok(match algo {
-            PubkeyAlgorithmIdentifier::Rsa => Self::Rsa(RsaPublicKeyInfo { subject_public_key }),
+            PubkeyAlgorithmIdentifier::Rsa => {
+                // RSA key params are encoded as BIT STRING { SEQUENCE { params } }
+                let mut inner_reader = der::SliceReader::new(subject_public_key.raw_bytes())?;
+                let rsa_seq = RsaPublicKeyInfo::decode(&mut inner_reader)?;
+                Self::Rsa(rsa_seq)
+            }
             PubkeyAlgorithmIdentifier::Unknown(id) => Self::Unknown(AnySubjectPublicKeyInfo {
                 algorithm: id,
                 subject_public_key,
