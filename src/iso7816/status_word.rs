@@ -91,8 +91,8 @@ impl StatusWord {
             0x6300 => "Unspecified modifying warning",
             0x6340 => "Unsuccessful comparison",
             0x6381 => "File or data object filled up by last write",
-            0x63c0..=0x63cf => "Counter value", /* Command specific, e.g. number of allowed
-                                                  * retries. */
+            0x63c0..=0x63cf => "Counter value", // Command specific, e.g. number of allowed
+            // retries.
             0x6300..=0x63ff => "Unknown modifying warning", // Catch all
 
             // Non-modifying execution errors

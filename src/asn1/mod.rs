@@ -23,7 +23,9 @@ mod signature_algorithm_identifier;
 pub use self::{
     application_tagged::ApplicationTagged,
     content_info::{ContentInfo, ContentType},
-    digest_algorithm_identifier::DigestAlgorithmIdentifier,
+    digest_algorithm_identifier::{
+        DigestAlgorithmIdentifier, Parameters as DigestAlgorithmParameters,
+    },
     signature_algorithm_identifier::SignatureAlgorithmIdentifier,
 };
 use der::{asn1::ObjectIdentifier as Oid, Any, Sequence, ValueOrd};
