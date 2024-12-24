@@ -18,7 +18,7 @@ mod digest_algorithm_identifier;
 pub mod emrtd;
 mod ordered_set;
 pub mod public_key_info;
-mod signature_algorithm_identifier;
+pub mod signature_algorithm_identifier;
 
 pub use self::{
     application_tagged::ApplicationTagged,

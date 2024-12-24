@@ -13,7 +13,7 @@ pub const ID_MGFA_MGF1SHA1: Oid = Oid::new_unwrap("1.2.840.113549.1.1.8");
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub enum SignatureAlgorithmIdentifier {
-    Rsa(Option<RsaSsaPssParameters>),
+    Rsa(RsaPssParameters),
     Unknown(AnyAlgorithmIdentifier),
 }
 
@@ -48,7 +48,7 @@ impl<'a> DecodeValue<'a> for SignatureAlgorithmIdentifier {
     fn decode_value<R: Reader<'a>>(reader: &mut R, _header: der::Header) -> Result<Self> {
         let oid = Oid::decode(reader)?;
         Ok(match oid {
-            ID_SIG_RSASSA_PSS => Self::Rsa(Option::<RsaSsaPssParameters>::decode(reader)?),
+            ID_SIG_RSASSA_PSS => Self::Rsa(RsaPssParameters::decode(reader)?),
             _ => Self::Unknown(AnyAlgorithmIdentifier {
                 algorithm:  oid,
                 parameters: Option::<Any>::decode(reader)?,
@@ -66,7 +66,7 @@ impl<'a> DecodeValue<'a> for SignatureAlgorithmIdentifier {
 //     saltLength         [2] INTEGER DEFAULT 20,
 //     trailerField       [3] INTEGER DEFAULT 1 }
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord, Sequence)]
-pub struct RsaSsaPssParameters {
+pub struct RsaPssParameters {
     #[asn1(context_specific = "0", default = "default_hash_algorithm")]
     pub hash_algorithm:     DigestAlgorithmIdentifier,
     #[asn1(context_specific = "1", default = "default_mask_gen_algorithm")]

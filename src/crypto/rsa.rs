@@ -5,9 +5,12 @@
 //! using it. See e.g. https://blog.trailofbits.com/2019/07/08/fuck-rsa
 
 use {
-    super::mod_ring::{ModRing, ModRingElementRef, UintMont},
-    crate::asn1::public_key_info::SubjectPublicKeyInfo,
-    anyhow::{bail, ensure, Error, Result},
+    super::mod_ring::{ModRing, ModRingElementRef, RingRefExt, UintMont},
+    crate::asn1::{
+        public_key_info::SubjectPublicKeyInfo, signature_algorithm_identifier::RsaPssParameters,
+        DigestAlgorithmIdentifier,
+    },
+    anyhow::{anyhow, bail, ensure, Error, Result},
     ruint::Uint,
     subtle::ConstantTimeEq,
 };
@@ -33,6 +36,123 @@ impl<U: UintMont> RSAPublicKey<U> {
         );
         Ok(())
     }
+
+    /// Verify a RSA-PSS signature, per RFC 8017.
+    fn verify_pss(
+        &self,
+        message: &[u8],
+        signature: &[u8],
+        params: &RsaPssParameters,
+    ) -> Result<()> {
+        // Verifies h == h', where,
+        // EM (expected message) = signature^e mod n
+        // EM:  DB masked || h || 0xBC
+        // DB (data block): padding |∣ 0x01 |∣ salt
+        // DB masked = DB xor MFG(h)
+        // h' = hash(padding || hash(message) || salt)
+
+        let ring_bit_len = self.ring.modulus().bit_len();
+        let digest_algo = &params.hash_algorithm;
+        let salt_len = params.salt_length.as_bytes()[0] as usize;
+        let trailer_field = params.trailer_field.as_bytes()[0] as usize;
+        if trailer_field != 1 {
+            bail!("Unrecognized trailer field {trailer_field}. Expected value 1 (= 0xbc)");
+        }
+
+        if signature.len() > ring_bit_len / 8 {
+            bail!("Signature too large for {}-bit modulus", ring_bit_len);
+        }
+        let sig_uint = U::from_be_bytes(&signature);
+        let ring_ref = &self.ring;
+        let sig_elem = ring_ref.from(sig_uint);
+
+        // Expected message: sig^e mod n
+        let em_elem = sig_elem.pow_ct(self.public_exponent);
+        let em_bytes = em_elem.to_uint().to_be_bytes();
+
+        let em_len = (self.ring.modulus().bit_len() + 7) / 8;
+        if em_bytes.len() > em_len {
+            bail!("Calculated expected message longer than modulus");
+        }
+
+        // Check trailer (0xBC byte)
+        if *em_bytes.last().unwrap_or(&0) != 0xbc {
+            bail!("Invalid PSS trailer byte");
+        }
+
+        // Split DB/H from EM
+        let hash_len = digest_algo.hash_bytes(&[]).len();
+        if em_len < hash_len + salt_len + 2 {
+            bail!("Encoded message too short for PSS");
+        }
+        let db_len = em_len - hash_len - 1;
+        let db = &em_bytes[..db_len];
+        let h = &em_bytes[db_len..db_len + hash_len];
+
+        // MGF1 unmask
+        let mgf_mask = mgf1(&digest_algo, h, db_len);
+        let mut db_unmasked = vec![0u8; db_len];
+        for (i, &b) in db.iter().enumerate() {
+            db_unmasked[i] = b ^ mgf_mask[i];
+        }
+        let em_bits = ring_bit_len - 1;
+        db_unmasked[0] &= 0xff >> (8 * em_len - em_bits);
+
+        // Verify DB format
+        let salt_start = db_len - salt_len;
+        let mut one = None;
+        for i in (0..salt_start).rev() {
+            if db_unmasked[i] == 0x01 {
+                one = Some(i);
+                break;
+            } else if db_unmasked[i] != 0x00 {
+                break;
+            }
+        }
+        let one_pos = one.ok_or_else(|| anyhow!("DB format mismatch: missing 0x01"))?;
+
+        // Verify all bytes before 0x01 are 0x00
+        if db_unmasked[..one_pos].iter().any(|&b| b != 0) {
+            bail!("DB format mismatch: invalid padding");
+        }
+
+        // Recovered salt
+        let salt = &db_unmasked[one_pos + 1..];
+
+        if salt.len() != salt_len {
+            bail!("Salt length mismatch");
+        }
+
+        // Compute h' = hash(padding || hash(message) || salt)
+        let message_hash = digest_algo.hash_bytes(message);
+
+        let mut pre_data = vec![0u8; 8]; // 8‐byte zero prefix
+        pre_data.extend_from_slice(&message_hash);
+        pre_data.extend_from_slice(salt);
+        let h_prime = digest_algo.hash_bytes(&pre_data);
+
+        if h_prime != h {
+            bail!("PSS verification: hash check failed");
+        }
+
+        Ok(())
+    }
+}
+
+fn mgf1(digest_alg: &DigestAlgorithmIdentifier, seed: &[u8], out_len: usize) -> Vec<u8> {
+    let mut mask = Vec::new();
+    let mut counter: u32 = 0;
+    while mask.len() < out_len {
+        let mut data = Vec::with_capacity(seed.len() + 4);
+        data.extend_from_slice(seed);
+        data.extend_from_slice(&counter.to_be_bytes());
+        let hash = digest_alg.hash_bytes(&data);
+        mask.extend_from_slice(&hash);
+        counter += 1;
+    }
+
+    mask.truncate(out_len);
+    mask
 }
 
 impl<const B: usize, const L: usize> TryFrom<SubjectPublicKeyInfo> for RSAPublicKey<Uint<B, L>> {
@@ -56,9 +176,13 @@ impl<const B: usize, const L: usize> TryFrom<SubjectPublicKeyInfo> for RSAPublic
 mod tests {
     use {
         super::*,
-        crate::asn1::public_key_info::SubjectPublicKeyInfo,
+        crate::asn1::{
+            public_key_info::SubjectPublicKeyInfo,
+            signature_algorithm_identifier::{MaskGenAlgorithm, RsaPssParameters},
+            DigestAlgorithmIdentifier, DigestAlgorithmParameters,
+        },
         anyhow::{ensure, Result},
-        der::Decode,
+        der::{asn1::Int, Decode},
         hex_literal::hex,
         num_traits::ToPrimitive,
         ruint::Uint,
@@ -66,14 +190,26 @@ mod tests {
 
     #[test]
     fn test_rsa_ssa_pss() -> Result<()> {
-        let subject_public_key = hex!("30820222300d06092a864886f70d01010105000382020f003082020a0282020100becc9fedc6ebb2ede36493138cf8cee05da57b5abc35becf062e1cce9bb196edf4ff6dcaa8e61d65f898ea63a601e8234f395041e3621b4541e1429882064eecd13feff1bf6123e5ce23354dd337aa1bc78eb711c97602d8574a21b336461c7133eda48f6fe7386b55bf1d8e8691ae25bf63b4cfc793e7f82d787941fc34022e194ff98870622e0fc1da78d39e9ee14236639adbcaa66fb2f488a59ff478176125072dbfa8223df2f0ac98d1f0f15695a9278b08b0873decef880d378f0577c9b1f9488198f060dd140a365d1f90387cbc9f8ba68453cb1b1d198b2875c87dcae9bf61ff54c7722f770a6b42ce3cb59f3de3dce9457d361c5859c05071fba664da91fb1a9cad08089656c761201d890c0a829e5d0c63cc6c710478515962e6b5675183085b2d60011ddf1b727cb33cb9ba8a6c9ff5859c546626be9e9d59917690710d6d31f8a2a8c03be9d61016a6b41817eb61807436027db51c5200316131f4cc3f4367d317c18ee6383c41d841fca963c180cd8766e703f888d08f5ae3bb3d4e709cde248cea9c7fb08470b70f916fd1a453bff4473c28ace2ff2365da00d62fd4a90090c30b085d432671826711308384984bf8e1df6ae5dd584c224a39d32c16771663728653e4a6a2152bf423022d37b91596ad9e148b80a759b3d7cd8571b12694c3deea30e9fa7ea878c0c739aa6e2be75785fc9cd9d68ae0d4b7530203010001");
-        let signature = hex!("31ac356deec3f3c8bf56e0306528aa7bd5bb01c7b5cf0588261a5a0f7f6e249922102b1c19c1786869ba431563f04f8c6b1b67245daf4b108f1c73bc3eaa4e944977ce7fd62f1d66ef36673fdb3cf91ecad8303e37c5d42f8a01e246dd0314140d7d3788ab4a7f52798dd603151ccb96da473669a757dc2c7b88912eb85dfbee44f047b7eec07bf94b10756f1c73b85b3b9a8bb0f8bcf3f6bdbeda53b4edae166f86b87bebe20f8d8acad2158fa67058133910169d7cd6519ffaa47e375d1f927e1a580f05c49a712f436d91062c208dd471c1093042398a930f4c03e398d0fa0d4fb2a1664723df050d42b251bd0e5d51a78d15709aca21aefb5212e19fb4c6");
+        // RSA-PSS example with MFG1/SHA256, 32 bytes salt
+        let subject_public_key = hex!("30820122300d06092a864886f70d01010105000382010f003082010a0282010100a2b451a07d0aa5f96e455671513550514a8a5b462ebef717094fa1fee82224e637f9746d3f7cafd31878d80325b6ef5a1700f65903b469429e89d6eac8845097b5ab393189db92512ed8a7711a1253facd20f79c15e8247f3d3e42e46e48c98e254a2fe9765313a03eff8f17e1a029397a1fa26a8dce26f490ed81299615d9814c22da610428e09c7d9658594266f5c021d0fceca08d945a12be82de4d1ece6b4c03145b5d3495d4ed5411eb878daf05fd7afc3e09ada0f1126422f590975a1969816f48698bcbba1b4d9cae79d460d8f9f85e7975005d9bc22c4e5ac0f7c1a45d12569a62807d3b9a02e5a530e773066f453d1f5b4c2e9cf7820283f742b9d50203010001");
+        let signature = hex!("68caf07e71ee654ffabf07d342fc4059deb4f7e5970746c423b1e8f668d5332275cc35eb61270aebd27855b1e80d59def47fe8882867fd33c2308c91976baa0b1df952caa78db4828ab81e79949bf145cbdfd1c4987ed036f81e8442081016f20fa4b587574884ca6f6045959ce3501ae7c02b1902ec1d241ef28dee356c0d30d28a950f1fbc683ee7d9aad26b048c13426fe3975d5638afeb5b9c1a99d162d3a5810e8b074d7a2eae2be52b577151f76e1f734b0a956ef4f22be64dc20a81ad1316e4f79dff5fc41fc08a20bc612283a88415d41595bfea66d59de7ac12e230f72244ad9905aef0ead3fa41ed70bf4218863d5f041292f2d14ce0a7271c6d36");
+        let message = hex!("313233343030");
+        // Construct RsaPssParamaters for this example
+        let digest_algo = DigestAlgorithmIdentifier::Sha256(DigestAlgorithmParameters::Absent);
+        let params = RsaPssParameters {
+            hash_algorithm:     digest_algo.clone(),
+            mask_gen_algorithm: MaskGenAlgorithm::Sha1(digest_algo),
+            salt_length:        Int::new(&[32]).unwrap(),
+            trailer_field:      Int::new(&[1]).unwrap(),
+        };
 
-        let pubkey_info = SubjectPublicKeyInfo::from_der(&subject_public_key).unwrap();
+        let pubkey_info = SubjectPublicKeyInfo::from_der(&subject_public_key)?;
         ensure!(matches!(pubkey_info, SubjectPublicKeyInfo::Rsa(_)));
 
-        let pubkey = RSAPublicKey::<Uint<4096, 64>>::try_from(pubkey_info)?;
+        let pubkey = RSAPublicKey::<Uint<2048, 32>>::try_from(pubkey_info)?;
         assert_eq!(pubkey.public_exponent.to_u64().unwrap(), 65537);
+
+        pubkey.verify_pss(&message, &signature, &params)?;
 
         Ok(())
     }

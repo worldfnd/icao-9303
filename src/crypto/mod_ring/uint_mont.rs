@@ -33,6 +33,9 @@ pub trait UintMont:
 
     /// Square root in Montgomery form.
     fn sqrt_mont(self, modulus: Self, mont_r: Self, mod_inv: u64) -> Option<Self>;
+
+    fn from_be_bytes(bytes: &[u8]) -> Self;
+    fn to_be_bytes(&self) -> Vec<u8>;
 }
 
 impl<const BITS: usize, const LIMBS: usize> UintMont for Uint<BITS, LIMBS> {
@@ -134,6 +137,16 @@ impl<const BITS: usize, const LIMBS: usize> UintMont for Uint<BITS, LIMBS> {
         } else {
             None
         }
+    }
+
+    #[inline]
+    fn from_be_bytes(bytes: &[u8]) -> Self {
+        Self::from_be_slice(bytes)
+    }
+
+    #[inline]
+    fn to_be_bytes(&self) -> Vec<u8> {
+        self.to_be_bytes_vec()
     }
 }
 
