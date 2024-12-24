@@ -9,7 +9,7 @@ use {
 };
 
 pub const ID_SIG_RSASSA_PSS: Oid = Oid::new_unwrap("1.2.840.113549.1.1.10");
-pub const ID_MGFA_MGF1SHA1: Oid = Oid::new_unwrap("1.2.840.113549.1.1.8");
+pub const ID_MGFA_MGF1: Oid = Oid::new_unwrap("1.2.840.113549.1.1.8");
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub enum SignatureAlgorithmIdentifier {
@@ -82,7 +82,7 @@ fn default_hash_algorithm() -> DigestAlgorithmIdentifier {
 }
 
 fn default_mask_gen_algorithm() -> MaskGenAlgorithm {
-    MaskGenAlgorithm::Sha1(DigestAlgorithmIdentifier::Sha1(
+    MaskGenAlgorithm::Mgf1(DigestAlgorithmIdentifier::Sha1(
         DigestAlgorithmParameters::Absent,
     ))
 }
@@ -97,7 +97,7 @@ fn default_trailer_field() -> Int {
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub enum MaskGenAlgorithm {
-    Sha1(DigestAlgorithmIdentifier),
+    Mgf1(DigestAlgorithmIdentifier),
     Unknown(AnyAlgorithmIdentifier),
 }
 
@@ -115,14 +115,14 @@ impl ValueOrd for MaskGenAlgorithm {
 impl EncodeValue for MaskGenAlgorithm {
     fn value_len(&self) -> Result<Length> {
         match self {
-            Self::Sha1(_) => todo!(),
+            Self::Mgf1(_) => todo!(),
             Self::Unknown(any) => any.value_len(),
         }
     }
 
     fn encode_value(&self, writer: &mut impl Writer) -> Result<()> {
         match self {
-            Self::Sha1(_) => todo!(),
+            Self::Mgf1(_) => todo!(),
             Self::Unknown(any) => any.encode(writer),
         }
     }
@@ -132,7 +132,7 @@ impl<'a> DecodeValue<'a> for MaskGenAlgorithm {
     fn decode_value<R: Reader<'a>>(reader: &mut R, _header: der::Header) -> Result<Self> {
         let oid = Oid::decode(reader)?;
         Ok(match oid {
-            ID_MGFA_MGF1SHA1 => Self::Sha1(DigestAlgorithmIdentifier::decode(reader)?),
+            ID_MGFA_MGF1 => Self::Mgf1(DigestAlgorithmIdentifier::decode(reader)?),
             _ => Self::Unknown(AnyAlgorithmIdentifier {
                 algorithm:  oid,
                 parameters: Option::<Any>::decode(reader)?,

@@ -7,7 +7,8 @@
 use {
     super::mod_ring::{ModRing, ModRingElementRef, RingRefExt, UintMont},
     crate::asn1::{
-        public_key_info::SubjectPublicKeyInfo, signature_algorithm_identifier::RsaPssParameters,
+        public_key_info::SubjectPublicKeyInfo,
+        signature_algorithm_identifier::{MaskGenAlgorithm, RsaPssParameters},
         DigestAlgorithmIdentifier,
     },
     anyhow::{anyhow, bail, ensure, Error, Result},
@@ -90,7 +91,10 @@ impl<U: UintMont> RSAPublicKey<U> {
         let h = &em_bytes[db_len..db_len + hash_len];
 
         // MGF1 unmask
-        let mgf_mask = mgf1(&digest_algo, h, db_len);
+        let mgf_mask = match &params.mask_gen_algorithm {
+            MaskGenAlgorithm::Mgf1(mgf1_da) => mgf1(mgf1_da, h, db_len),
+            _ => bail!("Unrecognized MaskGenAlgorithm. Only MGF1 supported"),
+        };
         let mut db_unmasked = vec![0u8; db_len];
         for (i, &b) in db.iter().enumerate() {
             db_unmasked[i] = b ^ mgf_mask[i];
@@ -139,14 +143,14 @@ impl<U: UintMont> RSAPublicKey<U> {
     }
 }
 
-fn mgf1(digest_alg: &DigestAlgorithmIdentifier, seed: &[u8], out_len: usize) -> Vec<u8> {
+fn mgf1(digest_algo: &DigestAlgorithmIdentifier, seed: &[u8], out_len: usize) -> Vec<u8> {
     let mut mask = Vec::new();
     let mut counter: u32 = 0;
     while mask.len() < out_len {
         let mut data = Vec::with_capacity(seed.len() + 4);
         data.extend_from_slice(seed);
         data.extend_from_slice(&counter.to_be_bytes());
-        let hash = digest_alg.hash_bytes(&data);
+        let hash = digest_algo.hash_bytes(&data);
         mask.extend_from_slice(&hash);
         counter += 1;
     }
@@ -198,7 +202,7 @@ mod tests {
         let digest_algo = DigestAlgorithmIdentifier::Sha256(DigestAlgorithmParameters::Absent);
         let params = RsaPssParameters {
             hash_algorithm:     digest_algo.clone(),
-            mask_gen_algorithm: MaskGenAlgorithm::Sha1(digest_algo),
+            mask_gen_algorithm: MaskGenAlgorithm::Mgf1(digest_algo),
             salt_length:        Int::new(&[32]).unwrap(),
             trailer_field:      Int::new(&[1]).unwrap(),
         };
