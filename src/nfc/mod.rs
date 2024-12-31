@@ -38,7 +38,8 @@ pub struct CardTypeB {
 }
 
 pub trait NfcReader {
-    // TODO: Should return card info, and reader/card capabilities like extended length.
+    // TODO: Should return card info, and reader/card capabilities like extended
+    // length.
     fn connect(&mut self) -> Result<Option<CardType>>;
     fn disconnect(&mut self) -> Result<()>;
     fn send_apdu(&mut self, apdu: &[u8]) -> Result<(StatusWord, Vec<u8>)>;

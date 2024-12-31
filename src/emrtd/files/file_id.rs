@@ -5,12 +5,12 @@ use {
     std::fmt::{self, Display, Formatter},
 };
 
-pub const EMRTD_LDS1_AID: &[u8] = &[0xA0, 0x00, 0x00, 0x02, 0x47, 0x10, 0x01];
+pub const EMRTD_LDS1_AID: &[u8] = &[0xa0, 0x00, 0x00, 0x02, 0x47, 0x10, 0x01];
 
 // Unsupported optional AIDs, mostly requiring terminal authentication.
-pub const EMRTD_TRAVEL_AID: &[u8] = &[0xA0, 0x00, 0x00, 0x02, 0x47, 0x20, 0x01];
-pub const EMRTD_VISA_AID: &[u8] = &[0xA0, 0x00, 0x00, 0x02, 0x47, 0x20, 0x02];
-pub const EMRTD_BIOMETRICS_AID: &[u8] = &[0xA0, 0x00, 0x00, 0x02, 0x47, 0x20, 0x03];
+pub const EMRTD_TRAVEL_AID: &[u8] = &[0xa0, 0x00, 0x00, 0x02, 0x47, 0x20, 0x01];
+pub const EMRTD_VISA_AID: &[u8] = &[0xa0, 0x00, 0x00, 0x02, 0x47, 0x20, 0x02];
+pub const EMRTD_BIOMETRICS_AID: &[u8] = &[0xa0, 0x00, 0x00, 0x02, 0x47, 0x20, 0x03];
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
 pub enum DedicatedId {
@@ -133,11 +133,11 @@ impl FileId {
     pub fn file_id(&self) -> u16 {
         // CardAccess and Sod are the same, but live in different applications.
         match self {
-            Self::AttrInfo => 0x2F01,
-            Self::Dir => 0x2F00,
-            Self::CardAccess => 0x011C,
-            Self::CardSecurity => 0x011D,
-            Self::Com => 0x011E,
+            Self::AttrInfo => 0x2f01,
+            Self::Dir => 0x2f00,
+            Self::CardAccess => 0x011c,
+            Self::CardSecurity => 0x011d,
+            Self::Com => 0x011e,
             Self::Dg1 => 0x0101,
             Self::Dg2 => 0x0102,
             Self::Dg3 => 0x0103,
@@ -147,24 +147,24 @@ impl FileId {
             Self::Dg7 => 0x0107,
             Self::Dg8 => 0x0108,
             Self::Dg9 => 0x0109,
-            Self::Dg10 => 0x010A,
-            Self::Dg11 => 0x010B,
-            Self::Dg12 => 0x010C,
-            Self::Dg13 => 0x010D,
-            Self::Dg14 => 0x010E,
-            Self::Dg15 => 0x010F,
+            Self::Dg10 => 0x010a,
+            Self::Dg11 => 0x010b,
+            Self::Dg12 => 0x010c,
+            Self::Dg13 => 0x010d,
+            Self::Dg14 => 0x010e,
+            Self::Dg15 => 0x010f,
             Self::Dg16 => 0x0110,
-            Self::Sod => 0x011D,
+            Self::Sod => 0x011d,
         }
     }
 
     pub fn short_id(&self) -> u8 {
         match self {
             Self::AttrInfo => 0x01,
-            Self::Dir => 0x1E,
-            Self::CardAccess => 0x1C,
-            Self::CardSecurity => 0x1D,
-            Self::Com => 0x1E,
+            Self::Dir => 0x1e,
+            Self::CardAccess => 0x1c,
+            Self::CardSecurity => 0x1d,
+            Self::Com => 0x1e,
             Self::Dg1 => 0x01,
             Self::Dg2 => 0x02,
             Self::Dg3 => 0x03,
@@ -174,14 +174,14 @@ impl FileId {
             Self::Dg7 => 0x07,
             Self::Dg8 => 0x08,
             Self::Dg9 => 0x09,
-            Self::Dg10 => 0x0A,
-            Self::Dg11 => 0x0B,
-            Self::Dg12 => 0x0C,
-            Self::Dg13 => 0x0D,
-            Self::Dg14 => 0x0E,
-            Self::Dg15 => 0x0F,
+            Self::Dg10 => 0x0a,
+            Self::Dg11 => 0x0b,
+            Self::Dg12 => 0x0c,
+            Self::Dg13 => 0x0d,
+            Self::Dg14 => 0x0e,
+            Self::Dg15 => 0x0f,
             Self::Dg16 => 0x10,
-            Self::Sod => 0x1D,
+            Self::Sod => 0x1d,
         }
     }
 

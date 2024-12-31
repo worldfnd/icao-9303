@@ -21,7 +21,7 @@ pub struct PaceDomainParameterInfo {
 
     /// Algorithm identifier for the domain parameter.
     pub domain_parameter: AnyAlgorithmIdentifier,
-    pub parameter_id: Option<u64>,
+    pub parameter_id:     Option<u64>,
 }
 
 impl PaceInfo {

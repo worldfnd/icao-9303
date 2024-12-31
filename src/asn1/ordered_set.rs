@@ -6,10 +6,11 @@ use {
     std::slice,
 };
 
-/// Variant of ASN1 SET that does not respect the cannonical order of the elements.
+/// Variant of ASN1 SET that does not respect the cannonical order of the
+/// elements.
 ///
-/// Some passports do not order the elements of SET correctly, and we need to preserve this
-/// to be able to encode the data back to the exact same bytes.
+/// Some passports do not order the elements of SET correctly, and we need to
+/// preserve this to be able to encode the data back to the exact same bytes.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct OrderedSet<T>(pub Vec<T>);
 

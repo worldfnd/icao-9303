@@ -16,8 +16,8 @@ pub const PACE_OID: Oid = Oid::new_unwrap("0.4.0.127.0.7.2.2.4");
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PaceProtocol {
     pub key_agreement: KeyAgreement,
-    pub key_mapping: KeyMapping,
-    pub cipher: Option<SymmetricCipher>,
+    pub key_mapping:   KeyMapping,
+    pub cipher:        Option<SymmetricCipher>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]

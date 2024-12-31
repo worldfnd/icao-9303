@@ -5,11 +5,12 @@
 mod codec;
 pub mod groups;
 pub mod mod_ring;
+mod rsa;
 mod signature;
 
 pub use codec::Codec;
 use {
-    crate::asn1::public_key::SubjectPublicKeyInfo,
+    crate::asn1::public_key_info::SubjectPublicKeyInfo,
     anyhow::{ensure, Result},
     der::asn1::OctetString,
     rand::{CryptoRng, RngCore},

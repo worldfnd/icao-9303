@@ -24,9 +24,9 @@ pub enum Error {
 #[derive(Debug)]
 pub struct ApduRef<'a> {
     pub header: &'a [u8],
-    pub lc: &'a [u8],
-    pub data: &'a [u8],
-    pub le: &'a [u8],
+    pub lc:     &'a [u8],
+    pub data:   &'a [u8],
+    pub le:     &'a [u8],
 }
 
 impl ApduRef<'_> {
@@ -60,24 +60,24 @@ pub fn parse_apdu(apdu: &[u8]) -> Result<ApduRef, Error> {
         // Short without data and no Le
         (4, None) => ApduRef {
             header: &apdu[..4],
-            lc: empty,
-            data: empty,
-            le: empty,
+            lc:     empty,
+            data:   empty,
+            le:     empty,
         },
         // Short without data and with Le
         (5, _) => ApduRef {
             header: &apdu[..4],
-            lc: empty,
-            data: empty,
-            le: &apdu[4..5],
+            lc:     empty,
+            data:   empty,
+            le:     &apdu[4..5],
         },
         (6, Some(&0x00)) => return Err(Error::LcZero),
         // Extended length, no data
         (7, Some(&0x00)) => ApduRef {
             header: &apdu[..4],
-            lc: empty,
-            data: empty,
-            le: &apdu[4..],
+            lc:     empty,
+            data:   empty,
+            le:     &apdu[4..],
         },
         // Extended length with data and maybe Le
         (_, Some(&0x00)) => {
@@ -89,17 +89,17 @@ pub fn parse_apdu(apdu: &[u8]) -> Result<ApduRef, Error> {
                 // Extended length with data and no Le
                 ApduRef {
                     header: &apdu[..4],
-                    lc: &apdu[4..7],
-                    data: &apdu[7..],
-                    le: empty,
+                    lc:     &apdu[4..7],
+                    data:   &apdu[7..],
+                    le:     empty,
                 }
             } else if apdu.len() - 9 == lc {
                 // Extended length with data and Le
                 ApduRef {
                     header: &apdu[..4],
-                    lc: &apdu[4..7],
-                    data: &apdu[7..7 + lc],
-                    le: &apdu[7 + lc..],
+                    lc:     &apdu[4..7],
+                    data:   &apdu[7..7 + lc],
+                    le:     &apdu[7 + lc..],
                 }
             } else {
                 return Err(Error::ExtendedApduTooLong);
@@ -108,16 +108,16 @@ pub fn parse_apdu(apdu: &[u8]) -> Result<ApduRef, Error> {
         // Short with data and no Le
         (_, Some(&lc)) if apdu.len() - 5 == lc as usize => ApduRef {
             header: &apdu[..4],
-            lc: &apdu[4..5],
-            data: &apdu[5..],
-            le: empty,
+            lc:     &apdu[4..5],
+            data:   &apdu[5..],
+            le:     empty,
         },
         // Short with data and Le
         (_, Some(&lc)) if apdu.len() - 6 == lc as usize => ApduRef {
             header: &apdu[..4],
-            lc: &apdu[4..5],
-            data: &apdu[5..apdu.len() - 1],
-            le: &apdu[apdu.len() - 1..],
+            lc:     &apdu[4..5],
+            data:   &apdu[5..apdu.len() - 1],
+            le:     &apdu[apdu.len() - 1..],
         },
         _ => return Err(Error::ApduTooLong),
     })

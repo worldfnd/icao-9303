@@ -6,7 +6,7 @@ use {
     der::Decode,
     glob::{glob, Pattern},
     hex_literal::hex,
-    icao_9303::{asn1::EfDg14, emrtd::secure_messaging::construct_secure_messaging},
+    icao_9303::{asn1::emrtd::EfDg14, emrtd::secure_messaging::construct_secure_messaging},
 };
 
 /// Test a parsing of exported eMRTD documents.

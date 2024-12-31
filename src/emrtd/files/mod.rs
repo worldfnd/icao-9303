@@ -4,7 +4,7 @@ pub use self::file_id::{DedicatedId, FileId};
 use {
     super::{Emrtd, Error, Result},
     crate::{
-        asn1::{EfCardAccess, EfDg14, EfSod},
+        asn1::emrtd::{EfCardAccess, EfDg14, EfSod},
         ensure_err,
         iso7816::StatusWord,
     },
@@ -92,7 +92,7 @@ impl Emrtd {
     pub fn select_master_file(&mut self) -> Result<()> {
         // Select by file identifier
         // See ISO/IEC 7816-4 section 11.2.2
-        let (status, data) = self.send_apdu(&[0x00, 0xA4, 0x00, 0x0C, 0x02, 0x3F, 0x00])?;
+        let (status, data) = self.send_apdu(&[0x00, 0xa4, 0x00, 0x0c, 0x02, 0x3f, 0x00])?;
         ensure_err!(status.is_success(), status.into());
         self.parent = DedicatedId::MasterFile;
         ensure_err!(data.is_empty(), Error::ResponseDataUnexpected);
@@ -103,7 +103,7 @@ impl Emrtd {
         if application_id.len() > 16 {
             return Err(Error::InvalidApplicationId);
         }
-        let mut apdu = vec![0x00, 0xA4, 0x04, 0x0C, application_id.len() as u8];
+        let mut apdu = vec![0x00, 0xa4, 0x04, 0x0c, application_id.len() as u8];
         apdu.extend_from_slice(application_id);
         let (status, data) = self.send_apdu(&apdu)?;
         ensure_err!(status.is_success(), status.into());
@@ -119,7 +119,7 @@ impl Emrtd {
         // See ICAO 9303-10 section 3.6.2
         let file_bytes = file.to_be_bytes();
         let (status, data) =
-            self.send_apdu(&[0x00, 0xA4, 0x02, 0x0C, 0x02, file_bytes[0], file_bytes[1]])?;
+            self.send_apdu(&[0x00, 0xa4, 0x02, 0x0c, 0x02, file_bytes[0], file_bytes[1]])?;
         ensure_err!(status.is_success(), status.into());
         ensure_err!(data.is_empty(), Error::ResponseDataUnexpected);
         Ok(())
@@ -133,7 +133,7 @@ impl Emrtd {
     // TODO: Check for extended length support before using.
     // See ICAO 9303-10 section 3.6.4.2.
     pub fn read_binary_short_ef(&mut self, file: u8) -> Result<Vec<u8>> {
-        if file > 0x1F {
+        if file > 0x1f {
             return Err(Error::InvalidShortFileId);
         }
         // Note b8 of p2 must be set to 1 to indicate that a short file id is used.
@@ -141,10 +141,10 @@ impl Emrtd {
         // Setting Le to 0x00 means read up to 256 / 65536.
         let apdu = if self.extended_length {
             // Setting Le to 0x000000 means 'read all' with extended length.
-            &[0x00, 0xB0, 0x80 | file, 0x00, 0x00, 0x00, 0x00][..]
+            &[0x00, 0xb0, 0x80 | file, 0x00, 0x00, 0x00, 0x00][..]
         } else {
             // Setting Le to 0x00 means 'read all'.
-            &[0x00, 0xB0, 0x80 | file, 0x00, 0x00][..]
+            &[0x00, 0xb0, 0x80 | file, 0x00, 0x00][..]
         };
         let (status, data) = self.send_apdu(apdu)?;
         ensure_err!(status.is_success(), status.into());
@@ -159,8 +159,9 @@ impl Emrtd {
 
         // Setting Le to 0x00 means 'read all'.
         // See ISO 7816-4 section 11.3.3.
-        // NOTE: Polish passports will zero-pad the response to 256 bytes, going beyond EOF.
-        let (status, data) = self.send_apdu(&[0x00, 0xB0, offset[0], offset[1], 0x00])?;
+        // NOTE: Polish passports will zero-pad the response to 256 bytes, going beyond
+        // EOF.
+        let (status, data) = self.send_apdu(&[0x00, 0xb0, offset[0], offset[1], 0x00])?;
         ensure_err!(status.is_success(), status.into());
         Ok(data)
     }

@@ -8,8 +8,7 @@ pub use {
     },
 };
 use {
-    super::ordered_set::OrderedSet,
-    crate::ensure_err,
+    crate::{asn1::ordered_set::OrderedSet, ensure_err},
     der::{
         asn1::{ObjectIdentifier as Oid, OctetString},
         Any, Decode, DecodeValue, Encode, EncodeValue, Error, ErrorKind, FixedTag, Header, Length,
@@ -59,7 +58,7 @@ pub enum SecurityInfo {
 /// ```
 #[derive(Clone, PartialEq, Eq, Debug, Sequence, ValueOrd)]
 pub struct AnySecurityInfo {
-    pub protocol: Oid,
+    pub protocol:      Oid,
     pub required_data: Any,
     pub optional_data: Option<Any>,
 }
@@ -67,7 +66,7 @@ pub struct AnySecurityInfo {
 #[derive(Clone, PartialEq, Eq, Debug, Sequence, ValueOrd)]
 pub struct EfDirInfo {
     pub protocol: Oid,
-    pub ef_dir: OctetString,
+    pub ef_dir:   OctetString,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]

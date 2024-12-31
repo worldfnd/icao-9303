@@ -22,7 +22,7 @@ pub const ID_SHA512_256: Oid = Oid::new_unwrap("2.16.840.1.101.3.4.2.6");
 // pub const ID_SHA3_224: Oid = Oid::new_unwrap("2.16.840.1.101.3.4.2.7");
 // pub const ID_SHA3_256: Oid = Oid::new_unwrap("2.16.840.1.101.3.4.2.7");
 
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug, PartialOrd, Ord)]
 pub enum DigestAlgorithmIdentifier {
     Sha1(Parameters),
     Sha256(Parameters),
@@ -35,7 +35,7 @@ pub enum DigestAlgorithmIdentifier {
 }
 
 /// See ICAO-9303-10 4.6 Note 2
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, PartialOrd, Ord)]
 pub enum Parameters {
     Absent,
     Null,
@@ -153,7 +153,7 @@ fn hash<D: Digest>(data: &[u8]) -> Vec<u8> {
 impl From<&DigestAlgorithmIdentifier> for AnyAlgorithmIdentifier {
     fn from(digest: &DigestAlgorithmIdentifier) -> Self {
         AnyAlgorithmIdentifier {
-            algorithm: digest.oid(),
+            algorithm:  digest.oid(),
             parameters: digest.parameters(),
         }
     }
@@ -169,7 +169,7 @@ impl TryFrom<AnyAlgorithmIdentifier> for DigestAlgorithmIdentifier {
             Some(any) => Err(Error::new(
                 ErrorKind::TagUnexpected {
                     expected: Some(Tag::Null),
-                    actual: any.tag(),
+                    actual:   any.tag(),
                 },
                 Length::ZERO,
             )),
