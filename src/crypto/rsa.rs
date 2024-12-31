@@ -17,13 +17,13 @@ use {
 
 #[derive(Clone, Debug)]
 pub struct RSAPublicKey<U: UintMont> {
-    ring:            ModRing<U>,
+    pub ring:        ModRing<U>,
     public_exponent: U,
 }
 
 impl<U: UintMont> RSAPublicKey<U> {
     /// Verify an RSA signature.
-    fn verify<'s>(
+    pub fn verify<'s>(
         &'s self,
         message: ModRingElementRef<'s, U>,
         signature: ModRingElementRef<'s, U>,
