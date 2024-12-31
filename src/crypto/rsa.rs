@@ -5,15 +5,14 @@
 //! using it. See e.g. https://blog.trailofbits.com/2019/07/08/fuck-rsa
 
 use {
-    super::mod_ring::{ModRing, ModRingElementRef, RingRefExt, UintMont},
+    super::mod_ring::{ModRing, ModRingElementRef, UintMont},
     crate::asn1::{
         public_key_info::SubjectPublicKeyInfo,
         signature_algorithm_identifier::{MaskGenAlgorithm, RsaPssParameters},
-        DigestAlgorithmIdentifier,
+        DigestAlgorithmIdentifier, SignatureAlgorithmIdentifier,
     },
     anyhow::{anyhow, bail, ensure, Error, Result},
     ruint::Uint,
-    subtle::ConstantTimeEq,
 };
 
 #[derive(Clone, Debug)]
@@ -23,26 +22,26 @@ pub struct RSAPublicKey<U: UintMont> {
 }
 
 impl<U: UintMont> RSAPublicKey<U> {
+    /// Verify an RSA signature.
     fn verify<'s>(
         &'s self,
         message: ModRingElementRef<'s, U>,
         signature: ModRingElementRef<'s, U>,
+        algorithm: &'s SignatureAlgorithmIdentifier,
     ) -> Result<()> {
-        assert_eq!(message.ring(), &self.ring);
-        assert_eq!(signature.ring(), &self.ring);
-        let expected = signature.pow_ct(self.public_exponent);
-        ensure!(
-            bool::from(message.ct_eq(&expected)),
-            "Invalid RSA signature"
-        );
-        Ok(())
+        match algorithm {
+            SignatureAlgorithmIdentifier::RsaPss(params) => {
+                self.verify_pss(message, signature, params)
+            }
+            _ => bail!("Unrecognized RSA signature algorithm"),
+        }
     }
 
-    /// Verify a RSA-PSS signature, per RFC 8017.
-    fn verify_pss(
-        &self,
-        message: &[u8],
-        signature: &[u8],
+    /// Verify an RSA-PSS signature, per RFC 8017.
+    fn verify_pss<'s>(
+        &'s self,
+        message: ModRingElementRef<'s, U>,
+        signature: ModRingElementRef<'s, U>,
         params: &RsaPssParameters,
     ) -> Result<()> {
         // Verifies h == h', where,
@@ -52,40 +51,35 @@ impl<U: UintMont> RSAPublicKey<U> {
         // DB masked = DB xor MFG(h)
         // h' = hash(padding || hash(message) || salt)
 
+        ensure!(signature.ring() == &self.ring);
+        ensure!(message.ring() == &self.ring);
+
         let ring_bit_len = self.ring.modulus().bit_len();
         let digest_algo = &params.hash_algorithm;
         let salt_len = params.salt_length.as_bytes()[0] as usize;
         let trailer_field = params.trailer_field.as_bytes()[0] as usize;
-        if trailer_field != 1 {
-            bail!("Unrecognized trailer field {trailer_field}. Expected value 1 (= 0xbc)");
-        }
+        ensure!(
+            trailer_field == 1,
+            "Unrecognized trailer field {trailer_field}. Expected value 1 (= 0xbc)"
+        );
 
-        if signature.len() > ring_bit_len / 8 {
-            bail!("Signature too large for {}-bit modulus", ring_bit_len);
-        }
-        let sig_uint = U::from_be_bytes(&signature);
-        let ring_ref = &self.ring;
-        let sig_elem = ring_ref.from(sig_uint);
-
-        // Expected message: sig^e mod n
-        let em_elem = sig_elem.pow_ct(self.public_exponent);
+        let em_elem = signature.pow_ct(self.public_exponent);
         let em_bytes = em_elem.to_uint().to_be_bytes();
-
         let em_len = (self.ring.modulus().bit_len() + 7) / 8;
-        if em_bytes.len() > em_len {
-            bail!("Calculated expected message longer than modulus");
-        }
 
         // Check trailer (0xBC byte)
-        if *em_bytes.last().unwrap_or(&0) != 0xbc {
-            bail!("Invalid PSS trailer byte");
-        }
+        ensure!(
+            *em_bytes.last().unwrap_or(&0) == 0xbc,
+            "Invalid PSS trailer byte"
+        );
 
         // Split DB/H from EM
         let hash_len = digest_algo.hash_bytes(&[]).len();
-        if em_len < hash_len + salt_len + 2 {
-            bail!("Encoded message too short for PSS");
-        }
+        ensure!(
+            em_len >= hash_len + salt_len + 2,
+            "Encoded message too short for PSS"
+        );
+
         let db_len = em_len - hash_len - 1;
         let db = &em_bytes[..db_len];
         let h = &em_bytes[db_len..db_len + hash_len];
@@ -116,28 +110,24 @@ impl<U: UintMont> RSAPublicKey<U> {
         let one_pos = one.ok_or_else(|| anyhow!("DB format mismatch: missing 0x01"))?;
 
         // Verify all bytes before 0x01 are 0x00
-        if db_unmasked[..one_pos].iter().any(|&b| b != 0) {
-            bail!("DB format mismatch: invalid padding");
-        }
+        ensure!(
+            db_unmasked[..one_pos].iter().all(|&b| b == 0),
+            "DB format mismatch: invalid padding"
+        );
 
         // Recovered salt
         let salt = &db_unmasked[one_pos + 1..];
-
-        if salt.len() != salt_len {
-            bail!("Salt length mismatch");
-        }
+        ensure!(salt.len() == salt_len, "Salt length mismatch");
 
         // Compute h' = hash(padding || hash(message) || salt)
-        let message_hash = digest_algo.hash_bytes(message);
+        let message_bytes = message.to_uint().to_be_bytes();
 
         let mut pre_data = vec![0u8; 8]; // 8‐byte zero prefix
-        pre_data.extend_from_slice(&message_hash);
+        pre_data.extend_from_slice(&message_bytes[message_bytes.len() - hash_len..]);
         pre_data.extend_from_slice(salt);
         let h_prime = digest_algo.hash_bytes(&pre_data);
 
-        if h_prime != h {
-            bail!("PSS verification: hash check failed");
-        }
+        ensure!(h_prime == h, "PSS verification: hash check failed");
 
         Ok(())
     }
@@ -165,10 +155,10 @@ impl<const B: usize, const L: usize> TryFrom<SubjectPublicKeyInfo> for RSAPublic
     fn try_from(info: SubjectPublicKeyInfo) -> Result<Self> {
         match info {
             SubjectPublicKeyInfo::Rsa(key) => {
-                let modulus = Uint::<B, L>::try_from(key.modulus)?;
+                let modulus = Uint::try_from(key.modulus)?;
                 Ok(Self {
                     ring:            ModRing::from_modulus(modulus),
-                    public_exponent: Uint::<B, L>::try_from(key.public_exponent)?,
+                    public_exponent: Uint::try_from(key.public_exponent)?,
                 })
             }
             _ => bail!("SubjectPublicKeyInfo is not RSA-variant"),
@@ -180,10 +170,13 @@ impl<const B: usize, const L: usize> TryFrom<SubjectPublicKeyInfo> for RSAPublic
 mod tests {
     use {
         super::*,
-        crate::asn1::{
-            public_key_info::SubjectPublicKeyInfo,
-            signature_algorithm_identifier::{MaskGenAlgorithm, RsaPssParameters},
-            DigestAlgorithmIdentifier, DigestAlgorithmParameters,
+        crate::{
+            asn1::{
+                public_key_info::SubjectPublicKeyInfo,
+                signature_algorithm_identifier::{MaskGenAlgorithm, RsaPssParameters},
+                DigestAlgorithmIdentifier, DigestAlgorithmParameters,
+            },
+            crypto::mod_ring::RingRefExt,
         },
         anyhow::{ensure, Result},
         der::{asn1::Int, Decode},
@@ -202,18 +195,27 @@ mod tests {
         let digest_algo = DigestAlgorithmIdentifier::Sha256(DigestAlgorithmParameters::Absent);
         let params = RsaPssParameters {
             hash_algorithm:     digest_algo.clone(),
-            mask_gen_algorithm: MaskGenAlgorithm::Mgf1(digest_algo),
+            mask_gen_algorithm: MaskGenAlgorithm::Mgf1(digest_algo.clone()),
             salt_length:        Int::new(&[32]).unwrap(),
             trailer_field:      Int::new(&[1]).unwrap(),
         };
+        let message_hash = digest_algo.hash_bytes(&message);
 
         let pubkey_info = SubjectPublicKeyInfo::from_der(&subject_public_key)?;
         ensure!(matches!(pubkey_info, SubjectPublicKeyInfo::Rsa(_)));
 
-        let pubkey = RSAPublicKey::<Uint<2048, 32>>::try_from(pubkey_info)?;
+        type Uint2048 = Uint<2048, 32>;
+
+        let pubkey = RSAPublicKey::<Uint2048>::try_from(pubkey_info)?;
         assert_eq!(pubkey.public_exponent.to_u64().unwrap(), 65537);
 
-        pubkey.verify_pss(&message, &signature, &params)?;
+        let signature_uint = Uint2048::from_be_slice(&signature);
+        let message_uint = Uint2048::from_be_slice(&message_hash);
+
+        let signature_elem = pubkey.ring.from(signature_uint);
+        let message_elem = pubkey.ring.from(message_uint);
+
+        pubkey.verify_pss(message_elem, signature_elem, &params)?;
 
         Ok(())
     }

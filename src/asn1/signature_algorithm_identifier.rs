@@ -13,7 +13,7 @@ pub const ID_MGFA_MGF1: Oid = Oid::new_unwrap("1.2.840.113549.1.1.8");
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub enum SignatureAlgorithmIdentifier {
-    Rsa(RsaPssParameters),
+    RsaPss(RsaPssParameters),
     Unknown(AnyAlgorithmIdentifier),
 }
 
@@ -31,14 +31,14 @@ impl ValueOrd for SignatureAlgorithmIdentifier {
 impl EncodeValue for SignatureAlgorithmIdentifier {
     fn value_len(&self) -> Result<Length> {
         match self {
-            Self::Rsa(_) => todo!(),
+            Self::RsaPss(_) => todo!(),
             Self::Unknown(any) => any.value_len(),
         }
     }
 
     fn encode_value(&self, writer: &mut impl Writer) -> Result<()> {
         match self {
-            Self::Rsa(_) => todo!(),
+            Self::RsaPss(_) => todo!(),
             Self::Unknown(any) => any.encode(writer),
         }
     }
@@ -48,7 +48,7 @@ impl<'a> DecodeValue<'a> for SignatureAlgorithmIdentifier {
     fn decode_value<R: Reader<'a>>(reader: &mut R, _header: der::Header) -> Result<Self> {
         let oid = Oid::decode(reader)?;
         Ok(match oid {
-            ID_SIG_RSASSA_PSS => Self::Rsa(RsaPssParameters::decode(reader)?),
+            ID_SIG_RSASSA_PSS => Self::RsaPss(RsaPssParameters::decode(reader)?),
             _ => Self::Unknown(AnyAlgorithmIdentifier {
                 algorithm:  oid,
                 parameters: Option::<Any>::decode(reader)?,
