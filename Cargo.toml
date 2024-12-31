@@ -58,7 +58,7 @@ hex-literal = "0.4.1"
 num-traits = "0.2.19"
 num_enum = "0.7.3"
 rand = "0.8.5"
-ruint = { version = "1.12.3", features = [
+ruint = { version = "1.12.4", features = [
     "rand",
     "subtle",
     "der",
@@ -78,6 +78,3 @@ glob = "0.3.1"
 serde = "1.0.210"
 serde_json = "1.0.128"
 base64 = "0.22.1"
-
-[patch.crates-io]
-ruint = { git = "https://github.com/recmo/uint", branch = "recmo/montgomery" }

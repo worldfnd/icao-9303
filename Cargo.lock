@@ -961,8 +961,9 @@ dependencies = [
 
 [[package]]
 name = "ruint"
-version = "1.12.3"
-source = "git+https://github.com/recmo/uint?branch=recmo%2Fmontgomery#2af379b98078929eb545d609d858dbfc478d2706"
+version = "1.12.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f5ef8fb1dd8de3870cb8400d51b4c2023854bbafd5431a3ac7e7317243e22d2f"
 dependencies = [
  "alloy-rlp",
  "ark-ff 0.3.0",
