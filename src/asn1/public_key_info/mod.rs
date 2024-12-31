@@ -15,6 +15,7 @@ use {
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 pub enum SubjectPublicKeyInfo {
     Rsa(RsaPublicKeyInfo),
+    Ec(EcPublicKeyInfo),
     Unknown(AnySubjectPublicKeyInfo),
 }
 
@@ -26,9 +27,13 @@ pub struct AnySubjectPublicKeyInfo {
 
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord, Sequence, ValueOrd)]
 pub struct RsaPublicKeyInfo {
-    // pub subject_public_key: BitString,
     pub modulus:         Int,
     pub public_exponent: Int,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord, Sequence, ValueOrd)]
+pub struct EcPublicKeyInfo {
+    pub point: ECPoint,
 }
 
 /// Diffie-Hellman Mod-P Group Parameters.
@@ -78,7 +83,8 @@ pub type ECPoint = OctetString;
 impl SubjectPublicKeyInfo {
     pub fn bit_len(&self) -> usize {
         match self {
-            Self::Rsa(info) => todo!(),
+            Self::Rsa(_info) => todo!(),
+            Self::Ec(_info) => todo!(),
             Self::Unknown(info) => info.subject_public_key.bit_len(),
         }
     }
@@ -99,6 +105,7 @@ impl EncodeValue for SubjectPublicKeyInfo {
     fn value_len(&self) -> Result<Length> {
         match self {
             Self::Rsa(_info) => todo!(),
+            Self::Ec(_info) => todo!(),
             Self::Unknown(info) => info.value_len(),
         }
     }
@@ -106,6 +113,7 @@ impl EncodeValue for SubjectPublicKeyInfo {
     fn encode_value(&self, writer: &mut impl Writer) -> Result<()> {
         match self {
             Self::Rsa(_info) => todo!(),
+            Self::Ec(_info) => todo!(),
             Self::Unknown(any) => any.encode(writer),
         }
     }
@@ -121,6 +129,11 @@ impl<'a> DecodeValue<'a> for SubjectPublicKeyInfo {
                 let mut inner_reader = der::SliceReader::new(subject_public_key.raw_bytes())?;
                 let rsa_seq = RsaPublicKeyInfo::decode(&mut inner_reader)?;
                 Self::Rsa(rsa_seq)
+            }
+            PubkeyAlgorithmIdentifier::Ec(_) => {
+                // EC key BIT STRING is mapped as an OCTET STRING
+                let point = OctetString::new(subject_public_key.as_bytes().unwrap_or(&[]))?;
+                Self::Ec(EcPublicKeyInfo { point })
             }
             PubkeyAlgorithmIdentifier::Unknown(id) => Self::Unknown(AnySubjectPublicKeyInfo {
                 algorithm: id,
