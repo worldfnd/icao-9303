@@ -143,3 +143,10 @@ impl<'a> DecodeValue<'a> for SubjectPublicKeyInfo {
         })
     }
 }
+
+impl TryFrom<&spki::SubjectPublicKeyInfoOwned> for SubjectPublicKeyInfo {
+    type Error = anyhow::Error;
+    fn try_from(spki_pk: &spki::SubjectPublicKeyInfoOwned) -> anyhow::Result<Self, anyhow::Error> {
+        Ok(Self::from_der(&spki_pk.to_der()?)?)
+    }
+}
