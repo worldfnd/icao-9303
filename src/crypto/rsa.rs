@@ -25,7 +25,7 @@ impl<U: UintMont> RSAPublicKey<U> {
     /// Verify an RSA signature.
     pub fn verify<'s>(
         &'s self,
-        message: ModRingElementRef<'s, U>,
+        message: &[u8],
         signature: ModRingElementRef<'s, U>,
         algorithm: &'s SignatureAlgorithmIdentifier,
     ) -> Result<()> {
@@ -40,7 +40,7 @@ impl<U: UintMont> RSAPublicKey<U> {
     /// Verify an RSA-PSS signature, per RFC 8017.
     fn verify_pss<'s>(
         &'s self,
-        message: ModRingElementRef<'s, U>,
+        message: &[u8],
         signature: ModRingElementRef<'s, U>,
         params: &RsaPssParameters,
     ) -> Result<()> {
@@ -52,7 +52,6 @@ impl<U: UintMont> RSAPublicKey<U> {
         // h' = hash(padding || hash(message) || salt)
 
         ensure!(signature.ring() == &self.ring);
-        ensure!(message.ring() == &self.ring);
 
         let ring_bit_len = self.ring.modulus().bit_len();
         let digest_algo = &params.hash_algorithm;
@@ -120,10 +119,10 @@ impl<U: UintMont> RSAPublicKey<U> {
         ensure!(salt.len() == salt_len, "Salt length mismatch");
 
         // Compute h' = hash(padding || hash(message) || salt)
-        let message_bytes = message.to_uint().to_be_bytes();
+        let message_hash = params.hash_algorithm.hash_bytes(message);
 
         let mut pre_data = vec![0u8; 8]; // 8‐byte zero prefix
-        pre_data.extend_from_slice(&message_bytes[message_bytes.len() - hash_len..]);
+        pre_data.extend_from_slice(&message_hash);
         pre_data.extend_from_slice(salt);
         let h_prime = digest_algo.hash_bytes(&pre_data);
 
@@ -199,7 +198,6 @@ mod tests {
             salt_length:        Int::new(&[32]).unwrap(),
             trailer_field:      Int::new(&[1]).unwrap(),
         };
-        let message_hash = digest_algo.hash_bytes(&message);
 
         let pubkey_info = SubjectPublicKeyInfo::from_der(&subject_public_key)?;
         ensure!(matches!(pubkey_info, SubjectPublicKeyInfo::Rsa(_)));
@@ -210,12 +208,9 @@ mod tests {
         assert_eq!(pubkey.public_exponent.to_u64().unwrap(), 65537);
 
         let signature_uint = Uint2048::from_be_slice(&signature);
-        let message_uint = Uint2048::from_be_slice(&message_hash);
-
         let signature_elem = pubkey.ring.from(signature_uint);
-        let message_elem = pubkey.ring.from(message_uint);
 
-        pubkey.verify_pss(message_elem, signature_elem, &params)?;
+        pubkey.verify_pss(&message, signature_elem, &params)?;
 
         Ok(())
     }
