@@ -6,7 +6,11 @@ use {
     dataset::Dataset,
     der::Decode,
     icao_9303::asn1::{
-        emrtd::{security_info::SecurityInfo, EfDg14, EfSod},
+        emrtd::{
+            pki::{CscaMasterList, MasterList},
+            security_info::SecurityInfo,
+            EfDg14, EfSod,
+        },
         DigestAlgorithmIdentifier,
     },
 };
@@ -72,6 +76,17 @@ fn test_decode_sod() -> Result<()> {
 
     // Signer
     assert_eq!(sod.signer_info().version, CmsVersion::V1);
+
+    Ok(())
+}
+
+#[test]
+fn test_decode_master_list() -> Result<()> {
+    let dataset = Dataset::load()?;
+    let ml = MasterList::from_der(&dataset.master_list)?;
+    let csca_ml = ml.csca_ml()?;
+
+    ensure!(csca_ml.version == 0);
 
     Ok(())
 }
