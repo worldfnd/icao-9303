@@ -141,6 +141,13 @@ impl<'a> DecodeValue<'a> for MaskGenAlgorithm {
     }
 }
 
+impl TryFrom<&spki::AlgorithmIdentifierOwned> for SignatureAlgorithmIdentifier {
+    type Error = anyhow::Error;
+    fn try_from(id: &spki::AlgorithmIdentifierOwned) -> anyhow::Result<Self, anyhow::Error> {
+        Ok(Self::from_der(&id.to_der()?)?)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use {super::*, hex_literal::hex};
