@@ -2,11 +2,15 @@
 
 use {
     crate::{
-        asn1::{emrtd::EfSod, public_key_info::SubjectPublicKeyInfo, SignatureAlgorithmIdentifier},
+        asn1::{
+            emrtd::{pki::CscaMasterList, EfSod},
+            public_key_info::SubjectPublicKeyInfo,
+            SignatureAlgorithmIdentifier,
+        },
         crypto::{mod_ring::RingRefExt, rsa::RSAPublicKey},
     },
     anyhow::{anyhow, ensure, Result},
-    cms::cert::CertificateChoices,
+    cms::{cert::CertificateChoices, content_info::CmsVersion},
     der::Encode,
     ruint::Uint,
 };
@@ -16,6 +20,12 @@ impl EfSod {
     pub fn verify_signature(&self) -> Result<()> {
         let signer = self.signer_info();
         let signature_algo = SignatureAlgorithmIdentifier::try_from(&signer.signature_algorithm)?;
+
+        // ICAO 9303-10 4.6.2.2: SignedData must be version 3
+        ensure!(
+            self.signed_data().version == CmsVersion::V3,
+            "SignedData must be version 3"
+        );
 
         // ICAO 9303-10 4.6.2.2: Certificates field is mandatory
         let certificates = &self
