@@ -9,16 +9,17 @@ use {
 
 /// Raw BSI TR-03105-5 ReferenceDataSet.
 pub struct Dataset {
-    pub dg1:       Vec<u8>,
-    pub dg2:       Vec<u8>,
-    pub dg3:       Vec<u8>,
-    pub dg4:       Vec<u8>,
-    pub dg14:      Vec<u8>,
-    pub dg15:      Vec<u8>,
-    pub com:       Vec<u8>,
-    pub sod:       Vec<u8>,
-    pub dg14_keys: Keypair,
-    pub dg15_keys: Keypair,
+    pub dg1:         Vec<u8>,
+    pub dg2:         Vec<u8>,
+    pub dg3:         Vec<u8>,
+    pub dg4:         Vec<u8>,
+    pub dg14:        Vec<u8>,
+    pub dg15:        Vec<u8>,
+    pub com:         Vec<u8>,
+    pub sod:         Vec<u8>,
+    pub dg14_keys:   Keypair,
+    pub dg15_keys:   Keypair,
+    pub master_list: Vec<u8>,
 }
 
 /// Public-private key pair.
@@ -47,6 +48,8 @@ impl Dataset {
             sk: Self::read_binfile("tests/dataset/DG15_sk.pkcs8")?,
         };
 
+        let master_list = Self::read_binfile("DE_ML_2024-12-19-10-09-11.ml")?;
+
         Ok(Self {
             dg1,
             dg2,
@@ -58,6 +61,7 @@ impl Dataset {
             sod,
             dg14_keys,
             dg15_keys,
+            master_list,
         })
     }
 

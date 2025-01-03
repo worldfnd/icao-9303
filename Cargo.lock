@@ -619,6 +619,7 @@ dependencies = [
  "serde_json",
  "sha1",
  "sha2",
+ "spki",
  "subtle",
  "thiserror 1.0.69",
  "trace",

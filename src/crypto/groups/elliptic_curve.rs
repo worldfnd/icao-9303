@@ -437,6 +437,10 @@ impl<'a, U: 'a + UintMont> CryptoGroup<'a> for EllipticCurve<U> {
     fn random_scalar(&'a self, rng: &mut dyn super::CryptoCoreRng) -> Self::ScalarElement {
         self.scalar_field().random(rng)
     }
+
+    fn x_of(&'a self, point: &Self::BaseElement) -> Option<Self::ScalarElement> {
+        point.coordinates().as_ref().map(|p| p.0)
+    }
 }
 
 #[cfg(test)]
