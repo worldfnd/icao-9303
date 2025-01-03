@@ -57,6 +57,9 @@ pub trait CryptoGroup<'s> {
     /// This is used for key generation and should meet the security
     /// requirements of the group.
     fn random_scalar(&'s self, rng: &mut dyn CryptoCoreRng) -> Self::ScalarElement;
+
+    /// Returns the coordinate x of a given point.
+    fn x_of(&'s self, point: &Self::BaseElement) -> Option<Self::ScalarElement>;
 }
 
 impl<T> GroupElement for T where

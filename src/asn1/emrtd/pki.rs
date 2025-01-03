@@ -30,6 +30,10 @@ impl ContentType for CscaMasterList {
 }
 
 impl MasterList {
+    pub fn signed_data(&self) -> &SignedData {
+        &self.0
+    }
+
     pub fn encapsulated_content(&self) -> &EncapsulatedContentInfo {
         &self.0.encap_content_info
     }

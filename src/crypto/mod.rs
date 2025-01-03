@@ -4,8 +4,10 @@
 
 pub mod cipher;
 mod codec;
+mod ecdsa;
 pub mod groups;
 pub mod mod_ring;
+mod pki;
 mod rsa;
 mod signature;
 

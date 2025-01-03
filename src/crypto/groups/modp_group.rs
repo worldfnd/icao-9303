@@ -65,6 +65,10 @@ impl<'s, U: 's + UintMont, V: 's + UintMont> CryptoGroup<'s> for ModPGroup<U, V>
         // X9.42 (repro in RFC 2631) require [2, (q - 2)]
         self.scalar_field().random(rng)
     }
+
+    fn x_of(&'s self, point: &Self::BaseElement) -> Option<Self::ScalarElement> {
+        todo!();
+    }
 }
 
 #[cfg(test)]
