@@ -2,11 +2,7 @@
 
 use {
     crate::{
-        asn1::{
-            emrtd::{pki::CscaMasterList, EfSod},
-            public_key_info::SubjectPublicKeyInfo,
-            SignatureAlgorithmIdentifier,
-        },
+        asn1::{emrtd::EfSod, public_key_info::SubjectPublicKeyInfo, SignatureAlgorithmIdentifier},
         crypto::{mod_ring::RingRefExt, rsa::RSAPublicKey},
     },
     anyhow::{anyhow, ensure, Result},
@@ -51,7 +47,7 @@ impl EfSod {
                     None
                 }
             })
-            .ok_or_else(|| anyhow!("Certificate not found in SignedData.certificates"))?;
+            .ok_or_else(|| anyhow!("Signer certfificate not found in SignedData.certificates"))?;
         let signer_pubkey = &cert.tbs_certificate.subject_public_key_info;
 
         type Uint2048 = Uint<2048, 32>;
