@@ -7,7 +7,7 @@ use {
             public_key_info::SubjectPublicKeyInfo,
             SignatureAlgorithmIdentifier,
         },
-        crypto::{mod_ring::RingRefExt, rsa::RSAPublicKey},
+        crypto::{ecdsa::ECPublicKey, mod_ring::RingRefExt},
     },
     anyhow::{anyhow, ensure, Result},
     cms::{cert::CertificateChoices, content_info::CmsVersion},
@@ -45,10 +45,8 @@ impl MasterList {
             })?;
         let master_pubkey = &master_cert.tbs_certificate.subject_public_key_info;
 
-        println!("{:?}", master_cert);
-
-        let list = self.csca_ml()?;
-        for cert in list.cert_list.iter() {}
+        // let list = self.csca_ml()?;
+        // for cert in list.cert_list.iter() {}
 
         Ok(())
     }
