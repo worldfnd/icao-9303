@@ -11,6 +11,12 @@ use {
 pub const ID_SIG_RSASSA_PSS: Oid = Oid::new_unwrap("1.2.840.113549.1.1.10");
 pub const ID_MGFA_MGF1: Oid = Oid::new_unwrap("1.2.840.113549.1.1.8");
 
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug, Sequence)]
+pub struct EcdsaSigValue {
+    pub r: Int,
+    pub s: Int,
+}
+
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub enum SignatureAlgorithmIdentifier {
     RsaPss(RsaPssParameters),
