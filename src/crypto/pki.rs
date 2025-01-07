@@ -60,10 +60,6 @@ impl MasterList {
         let signature = signer.signature.as_bytes();
         let EcdsaSigValue { r, s } = EcdsaSigValue::from_der(&signature)?;
 
-        let message_elem = pubkey
-            .curve
-            .scalar_field()
-            .from(U512::from_be_slice(&message));
         let r_elem = pubkey
             .curve
             .scalar_field()
@@ -78,7 +74,7 @@ impl MasterList {
             s: s_elem,
         };
 
-        pubkey.verify(message_elem, &signature)?;
+        pubkey.verify(&attrs_der, &signature, &signature_algo)?;
 
         // let list = self.csca_ml()?;
         // for cert in list.cert_list.iter() {}
