@@ -8,6 +8,7 @@ mod ecdsa;
 pub mod groups;
 pub mod mod_ring;
 mod pki;
+pub mod public_key;
 mod rsa;
 mod signature;
 

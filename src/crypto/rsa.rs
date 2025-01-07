@@ -7,7 +7,7 @@
 use {
     super::mod_ring::{ModRing, ModRingElementRef, UintMont},
     crate::asn1::{
-        public_key_info::SubjectPublicKeyInfo,
+        public_key_info::{RsaPublicKeyInfo, SubjectPublicKeyInfo},
         signature_algorithm_identifier::{MaskGenAlgorithm, RsaPssParameters},
         DigestAlgorithmIdentifier, SignatureAlgorithmIdentifier,
     },
@@ -132,6 +132,18 @@ impl<U: UintMont> RSAPublicKey<U> {
     }
 }
 
+impl<const B: usize, const L: usize> TryFrom<RsaPublicKeyInfo> for RSAPublicKey<Uint<B, L>> {
+    type Error = Error;
+
+    fn try_from(info: RsaPublicKeyInfo) -> Result<Self> {
+        let modulus = Uint::try_from(info.modulus)?;
+        Ok(Self {
+            ring:            ModRing::from_modulus(modulus),
+            public_exponent: Uint::try_from(info.public_exponent)?,
+        })
+    }
+}
+
 fn mgf1(digest_algo: &DigestAlgorithmIdentifier, seed: &[u8], out_len: usize) -> Vec<u8> {
     let mut mask = Vec::new();
     let mut counter: u32 = 0;
@@ -148,23 +160,6 @@ fn mgf1(digest_algo: &DigestAlgorithmIdentifier, seed: &[u8], out_len: usize) ->
     mask
 }
 
-impl<const B: usize, const L: usize> TryFrom<SubjectPublicKeyInfo> for RSAPublicKey<Uint<B, L>> {
-    type Error = Error;
-
-    fn try_from(info: SubjectPublicKeyInfo) -> Result<Self> {
-        match info {
-            SubjectPublicKeyInfo::Rsa(key) => {
-                let modulus = Uint::try_from(key.modulus)?;
-                Ok(Self {
-                    ring:            ModRing::from_modulus(modulus),
-                    public_exponent: Uint::try_from(key.public_exponent)?,
-                })
-            }
-            _ => bail!("SubjectPublicKeyInfo is not RSA-variant"),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use {
@@ -177,11 +172,11 @@ mod tests {
             },
             crypto::mod_ring::RingRefExt,
         },
-        anyhow::{ensure, Result},
+        anyhow::Result,
         der::{asn1::Int, Decode},
         hex_literal::hex,
         num_traits::ToPrimitive,
-        ruint::Uint,
+        ruint::aliases::U2048,
     };
 
     #[test]
@@ -200,14 +195,15 @@ mod tests {
         };
 
         let pubkey_info = SubjectPublicKeyInfo::from_der(&subject_public_key)?;
-        ensure!(matches!(pubkey_info, SubjectPublicKeyInfo::Rsa(_)));
+        let pubkey = if let SubjectPublicKeyInfo::RSA(info) = pubkey_info {
+            RSAPublicKey::<U2048>::try_from(info)?
+        } else {
+            bail!("SubjectPublicKeyInfo::RSA expected");
+        };
 
-        type Uint2048 = Uint<2048, 32>;
-
-        let pubkey = RSAPublicKey::<Uint2048>::try_from(pubkey_info)?;
         assert_eq!(pubkey.public_exponent.to_u64().unwrap(), 65537);
 
-        let signature_uint = Uint2048::from_be_slice(&signature);
+        let signature_uint = U2048::from_be_slice(&signature);
         let signature_elem = pubkey.ring.from(signature_uint);
 
         pubkey.verify_pss(&message, signature_elem, &params)?;
