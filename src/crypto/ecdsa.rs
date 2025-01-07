@@ -5,11 +5,14 @@ use {
         groups::{EllipticCurve, EllipticCurvePoint},
         mod_ring::{ModRingElementRef, RingRefExt, UintMont},
     },
-    crate::asn1::public_key_info::{ECAlgoParameters, FieldId, PubkeyAlgorithmIdentifier},
+    crate::asn1::{
+        public_key_info::{ECAlgoParameters, FieldId, PubkeyAlgorithmIdentifier},
+        DigestAlgorithmIdentifier, DigestAlgorithmParameters, SignatureAlgorithmIdentifier,
+    },
     anyhow::{anyhow, bail, ensure, Result},
     der::{Decode, Encode},
     num_traits::Inv,
-    ruint::Uint,
+    ruint::{aliases::U512, Uint},
 };
 
 #[derive(Clone, Debug)]
@@ -34,17 +37,36 @@ impl<U: UintMont> ECPublicKey<U> {
 
     pub fn verify<'c>(
         &'c self,
-        message_hash: ModRingElementRef<'c, U>,
+        message: &[u8],
         signature: &ECSignature<'c, U>,
+        algorithm: &'c SignatureAlgorithmIdentifier,
     ) -> Result<()> {
         let point = self.point()?;
         let ECSignature { r, s } = signature;
+
+        let digest_algo = match algorithm {
+            SignatureAlgorithmIdentifier::EcdsaSha224 => {
+                DigestAlgorithmIdentifier::Sha224(DigestAlgorithmParameters::Null)
+            }
+            SignatureAlgorithmIdentifier::EcdsaSha256 => {
+                DigestAlgorithmIdentifier::Sha256(DigestAlgorithmParameters::Null)
+            }
+            SignatureAlgorithmIdentifier::EcdsaSha384 => {
+                DigestAlgorithmIdentifier::Sha384(DigestAlgorithmParameters::Null)
+            }
+            SignatureAlgorithmIdentifier::EcdsaSha512 => {
+                DigestAlgorithmIdentifier::Sha512(DigestAlgorithmParameters::Null)
+            }
+            other => bail!("Unrecognized ECDSA signature algorithm: {other:?}"),
+        };
+        let hash = digest_algo.hash_bytes(&message);
+        let hash_elem = self.curve.scalar_field().from(U::from_be_bytes(&hash));
 
         // w = s^(-1) mod n
         let w = s.inv().ok_or_else(|| anyhow!("Invalid s value"))?;
 
         // u1 = e * w mod n
-        let u1 = message_hash * w;
+        let u1 = hash_elem * w;
 
         // u2 = r * w mod n
         let u2 = *r * w;
@@ -154,13 +176,11 @@ mod tests {
             s: curve.scalar_field().from(U256::from_be_slice(&s)),
         };
 
+        let signature_algo = SignatureAlgorithmIdentifier::EcdsaSha256;
+
         let digest_algo = DigestAlgorithmIdentifier::Sha256(DigestAlgorithmParameters::Null);
 
-        let message = digest_algo.hash_bytes(&message);
-        let message_uint = U256::from_be_slice(&message);
-        let message_elem = pubkey.curve.scalar_field().from(message_uint);
-
-        pubkey.verify(message_elem, &signature)?;
+        pubkey.verify(&message, &signature, &signature_algo)?;
 
         Ok(())
     }
