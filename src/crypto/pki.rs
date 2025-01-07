@@ -2,19 +2,12 @@
 
 use {
     crate::{
-        asn1::{
-            emrtd::pki::MasterList, signature_algorithm_identifier::EcdsaSigValue,
-            DigestAlgorithmIdentifier, DigestAlgorithmParameters, SignatureAlgorithmIdentifier,
-        },
-        crypto::{
-            ecdsa::{ECPublicKey, ECSignature},
-            mod_ring::RingRefExt,
-        },
+        asn1::{emrtd::pki::MasterList, SignatureAlgorithmIdentifier},
+        crypto::public_key::PublicKey,
     },
     anyhow::{anyhow, ensure, Result},
     cms::{cert::CertificateChoices, content_info::CmsVersion},
-    der::{Decode, Encode},
-    ruint::aliases::U512,
+    der::Encode,
 };
 
 impl MasterList {
@@ -50,7 +43,7 @@ impl MasterList {
                 anyhow!("Self-signed certfificate not found in SignedData.certificates")
             })?;
         let master_pubkey = &master_cert.tbs_certificate.subject_public_key_info;
-        let pubkey = ECPublicKey::<U512>::try_from(master_pubkey)?;
+        let pubkey = PublicKey::try_from(master_pubkey)?;
 
         let attrs = &signer
             .signed_attrs
@@ -60,21 +53,6 @@ impl MasterList {
         let signature_algo = SignatureAlgorithmIdentifier::try_from(&signer.signature_algorithm)?;
 
         let signature = signer.signature.as_bytes();
-        let EcdsaSigValue { r, s } = EcdsaSigValue::from_der(&signature)?;
-
-        let r_elem = pubkey
-            .curve
-            .scalar_field()
-            .from(U512::from_be_slice(&r.as_bytes()));
-        let s_elem = pubkey
-            .curve
-            .scalar_field()
-            .from(U512::from_be_slice(&s.as_bytes()));
-
-        let signature = ECSignature {
-            r: r_elem,
-            s: s_elem,
-        };
 
         pubkey.verify(&message, &signature, &signature_algo)?;
 

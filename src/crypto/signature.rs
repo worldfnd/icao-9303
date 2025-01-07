@@ -3,12 +3,11 @@
 use {
     crate::{
         asn1::{emrtd::EfSod, public_key_info::SubjectPublicKeyInfo, SignatureAlgorithmIdentifier},
-        crypto::{mod_ring::RingRefExt, rsa::RSAPublicKey},
+        crypto::public_key::PublicKey,
     },
     anyhow::{anyhow, ensure, Result},
     cms::{cert::CertificateChoices, content_info::CmsVersion},
     der::Encode,
-    ruint::Uint,
 };
 
 impl EfSod {
@@ -50,9 +49,7 @@ impl EfSod {
             .ok_or_else(|| anyhow!("Signer certfificate not found in SignedData.certificates"))?;
         let signer_pubkey = &cert.tbs_certificate.subject_public_key_info;
 
-        type Uint2048 = Uint<2048, 32>;
-        let pubkey =
-            RSAPublicKey::<Uint2048>::try_from(SubjectPublicKeyInfo::try_from(signer_pubkey)?)?;
+        let pubkey = PublicKey::try_from(SubjectPublicKeyInfo::try_from(signer_pubkey)?)?;
 
         // Message
         // ICAO 9303-10 4.6.2.2: signedAttrs field is mandatory
@@ -65,9 +62,7 @@ impl EfSod {
 
         // Signature
         let signature = signer.signature.as_bytes();
-        let signature_uint = Uint2048::from_be_slice(&signature);
-        let signature_elem = pubkey.ring.from(signature_uint);
 
-        pubkey.verify(&attrs_der, signature_elem, &signature_algo)
+        pubkey.verify(&attrs_der, signature, &signature_algo)
     }
 }

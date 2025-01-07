@@ -6,13 +6,12 @@ use {
         mod_ring::{ModRingElementRef, RingRefExt, UintMont},
     },
     crate::asn1::{
-        public_key_info::{ECAlgoParameters, FieldId, PubkeyAlgorithmIdentifier},
+        public_key_info::{ECAlgoParameters, EcPublicKeyInfo, FieldId},
         DigestAlgorithmIdentifier, DigestAlgorithmParameters, SignatureAlgorithmIdentifier,
     },
     anyhow::{anyhow, bail, ensure, Result},
-    der::{Decode, Encode},
     num_traits::Inv,
-    ruint::Uint,
+    ruint::{aliases::U512, Uint},
 };
 
 #[derive(Clone, Debug)]
@@ -85,47 +84,40 @@ impl<U: UintMont> ECPublicKey<U> {
     }
 }
 
-impl<const B: usize, const L: usize> TryFrom<&spki::SubjectPublicKeyInfoOwned>
+impl<const B: usize, const L: usize> TryFrom<(ECAlgoParameters, EcPublicKeyInfo)>
     for ECPublicKey<Uint<B, L>>
 {
     type Error = anyhow::Error;
-    fn try_from(spki_pk: &spki::SubjectPublicKeyInfoOwned) -> anyhow::Result<Self, anyhow::Error> {
-        let algo = PubkeyAlgorithmIdentifier::from_der(&spki_pk.algorithm.to_der()?)?;
-        match algo {
-            PubkeyAlgorithmIdentifier::Ec(params) => {
-                let point_bytes = spki_pk
-                    .subject_public_key
-                    .as_bytes()
-                    .ok_or_else(|| anyhow!("Failed getting BIT STRING as bytes"))?;
-                let curve = match params {
-                    ECAlgoParameters::EcParameters(params) => match params.field_id {
-                        FieldId::PrimeField { modulus } => {
-                            let p = Uint::try_from(modulus)?;
-                            let a = Uint::from_be_slice(params.curve.a.as_bytes());
-                            let b = Uint::from_be_slice(params.curve.b.as_bytes());
-                            let (x, y) = parse_ec_point(params.base.as_bytes())?;
-                            let order = Uint::try_from(params.order)?;
-                            let cofactor = Uint::try_from(
-                                params
-                                    .cofactor
-                                    .ok_or_else(|| anyhow!("Missing cofactor in EcParameters"))?,
-                            )?;
 
-                            EllipticCurve::new(p, a, b, x, y, order, cofactor)?
-                        }
-                        _ => todo!(),
-                    },
-                    _ => todo!(),
-                };
+    fn try_from(info: (ECAlgoParameters, EcPublicKeyInfo)) -> Result<Self> {
+        let (params, key) = info;
+        let point_bytes = key.point.as_bytes();
+        let curve = match params {
+            ECAlgoParameters::EcParameters(params) => match params.field_id {
+                FieldId::PrimeField { modulus } => {
+                    let p = Uint::try_from(modulus)?;
+                    let a = Uint::from_be_slice(params.curve.a.as_bytes());
+                    let b = Uint::from_be_slice(params.curve.b.as_bytes());
+                    let (x, y) = parse_ec_point(params.base.as_bytes())?;
+                    let order = Uint::try_from(params.order)?;
+                    let cofactor = Uint::try_from(
+                        params
+                            .cofactor
+                            .ok_or_else(|| anyhow!("Missing cofactor in EcParameters"))?,
+                    )?;
 
-                let (x, y) = parse_ec_point(point_bytes)?;
-                Ok(ECPublicKey {
-                    curve,
-                    point: (x, y),
-                })
-            }
-            _ => bail!("SubjectPublicKeyInfo not EC-variant"),
-        }
+                    EllipticCurve::new(p, a, b, x, y, order, cofactor)?
+                }
+                _ => todo!(),
+            },
+            _ => todo!(),
+        };
+
+        let (x, y) = parse_ec_point(point_bytes)?;
+        Ok(Self {
+            curve,
+            point: (x, y),
+        })
     }
 }
 
@@ -150,10 +142,7 @@ fn parse_ec_point<const B: usize, const L: usize>(
 mod tests {
     use {
         super::*,
-        crate::{
-            asn1::{DigestAlgorithmIdentifier, DigestAlgorithmParameters},
-            crypto::{groups::named::secp256r1, mod_ring::RingRefExt},
-        },
+        crate::crypto::{groups::named::secp256r1, mod_ring::RingRefExt},
         anyhow::Result,
         hex_literal::hex,
         ruint::aliases::U256,
@@ -180,8 +169,6 @@ mod tests {
         };
 
         let signature_algo = SignatureAlgorithmIdentifier::EcdsaSha256;
-
-        let digest_algo = DigestAlgorithmIdentifier::Sha256(DigestAlgorithmParameters::Null);
 
         pubkey.verify(&message, &signature, &signature_algo)?;
 
