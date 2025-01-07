@@ -12,7 +12,7 @@ use {
     anyhow::{anyhow, bail, ensure, Result},
     der::{Decode, Encode},
     num_traits::Inv,
-    ruint::{aliases::U512, Uint},
+    ruint::Uint,
 };
 
 #[derive(Clone, Debug)]
@@ -75,11 +75,11 @@ impl<U: UintMont> ECPublicKey<U> {
         let q = point.curve().generator() * u1 + point * u2;
 
         // Get x coordinate
-        let x = q.x().unwrap();
+        let x = q.x().ok_or_else(|| anyhow!("Failed getting Qx"))?;
         let x_scalar = self.curve.scalar_field().from(x.to_uint());
 
         // Compare with r
-        ensure!(x_scalar == *r, "Signature verification failed");
+        ensure!(x_scalar == *r, "Signature verification failed (Qx != r)");
 
         Ok(())
     }
@@ -93,7 +93,10 @@ impl<const B: usize, const L: usize> TryFrom<&spki::SubjectPublicKeyInfoOwned>
         let algo = PubkeyAlgorithmIdentifier::from_der(&spki_pk.algorithm.to_der()?)?;
         match algo {
             PubkeyAlgorithmIdentifier::Ec(params) => {
-                let point_bytes = spki_pk.subject_public_key.as_bytes().unwrap();
+                let point_bytes = spki_pk
+                    .subject_public_key
+                    .as_bytes()
+                    .ok_or_else(|| anyhow!("Failed getting BIT STRING as bytes"))?;
                 let curve = match params {
                     ECAlgoParameters::EcParameters(params) => match params.field_id {
                         FieldId::PrimeField { modulus } => {

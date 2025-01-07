@@ -20,6 +20,11 @@ use {
 impl MasterList {
     pub fn verify(&self) -> Result<()> {
         let sd = self.signed_data();
+        let signer = &sd
+            .signer_infos
+            .0
+            .get(0)
+            .ok_or_else(|| anyhow!("SignerInfo must be present"))?;
 
         // Structure checks, per ICAO 9303-12 9.1
         ensure!(sd.version == CmsVersion::V3);
@@ -47,15 +52,12 @@ impl MasterList {
         let master_pubkey = &master_cert.tbs_certificate.subject_public_key_info;
         let pubkey = ECPublicKey::<U512>::try_from(master_pubkey)?;
 
-        let signer = &sd.signer_infos.0.get(0).unwrap();
         let attrs = &signer
             .signed_attrs
             .as_ref()
             .ok_or_else(|| anyhow!("SignedData must contain the signedAttrs field"))?;
-        let attrs_der = attrs.to_der()?;
+        let message = attrs.to_der()?;
         let signature_algo = SignatureAlgorithmIdentifier::try_from(&signer.signature_algorithm)?;
-        let digest_algo = DigestAlgorithmIdentifier::Sha256(DigestAlgorithmParameters::Null);
-        let message = digest_algo.hash_bytes(&attrs_der);
 
         let signature = signer.signature.as_bytes();
         let EcdsaSigValue { r, s } = EcdsaSigValue::from_der(&signature)?;
@@ -74,7 +76,7 @@ impl MasterList {
             s: s_elem,
         };
 
-        pubkey.verify(&attrs_der, &signature, &signature_algo)?;
+        pubkey.verify(&message, &signature, &signature_algo)?;
 
         // let list = self.csca_ml()?;
         // for cert in list.cert_list.iter() {}

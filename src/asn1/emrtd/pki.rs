@@ -34,6 +34,14 @@ impl MasterList {
         &self.0
     }
 
+    /// Returns information of the signer.
+    ///
+    /// Per ICAO 9303-12, it is recommended that only one SignerInfo is
+    /// provided.
+    pub fn signer_info(&self) -> Option<&SignerInfo> {
+        self.signed_data().signer_infos.0.get(0)
+    }
+
     pub fn encapsulated_content(&self) -> &EncapsulatedContentInfo {
         &self.0.encap_content_info
     }
