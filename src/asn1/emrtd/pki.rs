@@ -29,6 +29,11 @@ impl ContentType for CscaMasterList {
     const CONTENT_TYPE: Oid = Oid::new_unwrap("2.23.136.1.1.2");
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Sequence)]
+pub struct ExtendedKeyUsage {
+    pub oid: Oid,
+}
+
 impl MasterList {
     pub fn signed_data(&self) -> &SignedData {
         &self.0
