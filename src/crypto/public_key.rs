@@ -10,12 +10,14 @@ use {
     },
     anyhow::Result,
     der::{Decode, Encode},
-    ruint::aliases::*,
+    ruint::{aliases::*, Uint},
 };
 
-#[derive(Clone, Debug)]
+type U521 = Uint<521, 9>;
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PublicKey {
-    EC(ECPublicKey<U512>),
+    EC(ECPublicKey<U521>),
     RSA(RSAPublicKey<U2048>),
 }
 
@@ -32,11 +34,11 @@ impl PublicKey {
                 let r_elem = key
                     .curve
                     .scalar_field()
-                    .from(U512::from_be_slice(&r.as_bytes()));
+                    .from(U521::from_be_slice(&r.as_bytes()));
                 let s_elem = key
                     .curve
                     .scalar_field()
-                    .from(U512::from_be_slice(&s.as_bytes()));
+                    .from(U521::from_be_slice(&s.as_bytes()));
                 let ecsig = ECSignature {
                     r: r_elem,
                     s: s_elem,

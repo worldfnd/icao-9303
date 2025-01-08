@@ -14,7 +14,7 @@ use {
     ruint::{aliases::U512, Uint},
 };
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ECPublicKey<U: UintMont> {
     pub curve: EllipticCurve<U>,
     pub point: (U, U),
@@ -44,6 +44,9 @@ impl<U: UintMont> ECPublicKey<U> {
         let ECSignature { r, s } = signature;
 
         let digest_algo = match algorithm {
+            SignatureAlgorithmIdentifier::EcdsaSha1 => {
+                DigestAlgorithmIdentifier::Sha1(DigestAlgorithmParameters::Null)
+            }
             SignatureAlgorithmIdentifier::EcdsaSha224 => {
                 DigestAlgorithmIdentifier::Sha224(DigestAlgorithmParameters::Null)
             }
