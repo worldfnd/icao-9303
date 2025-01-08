@@ -15,7 +15,7 @@ use {
     ruint::Uint,
 };
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RSAPublicKey<U: UintMont> {
     pub ring:        ModRing<U>,
     public_exponent: U,
