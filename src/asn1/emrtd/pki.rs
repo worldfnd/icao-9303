@@ -7,7 +7,8 @@ use {
     },
     der::{
         asn1::{ObjectIdentifier as Oid, OctetString, SetOfVec},
-        Decode, Error, ErrorKind, Length, Result, Sequence, Tag,
+        Decode, DecodeValue, Encode, EncodeValue, Error, ErrorKind, Length, Reader, Result,
+        Sequence, Tag, Writer,
     },
 };
 
@@ -29,7 +30,8 @@ impl ContentType for CscaMasterList {
     const CONTENT_TYPE: Oid = Oid::new_unwrap("2.23.136.1.1.2");
 }
 
-pub type CRL = CertificateList;
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CRL(pub CertificateList);
 
 #[derive(Clone, Debug, PartialEq, Eq, Sequence)]
 pub struct ExtendedKeyUsage {
@@ -77,5 +79,21 @@ impl MasterList {
             ))?
             .decode_as::<OctetString>()?;
         CscaMasterList::from_der(octet_string.as_bytes())
+    }
+}
+
+impl<'a> Decode<'a> for CRL {
+    fn decode<R: Reader<'a>>(reader: &mut R) -> Result<Self> {
+        CertificateList::decode(reader).map(Self)
+    }
+}
+
+impl Encode for CRL {
+    fn encode(&self, writer: &mut impl Writer) -> Result<()> {
+        self.0.encode(writer)
+    }
+
+    fn encoded_len(&self) -> Result<Length> {
+        self.0.encoded_len()
     }
 }
