@@ -6,59 +6,18 @@ use {
             emrtd::pki::{ExtendedKeyUsage, MasterList},
             SignatureAlgorithmIdentifier,
         },
-        crypto::public_key::PublicKey,
+        crypto::{
+            certificate::{Certificate, EmrtdPKIProfile},
+            public_key::PublicKey,
+        },
     },
     anyhow::{anyhow, ensure, Result},
-    cms::{
-        cert::{
-            x509::certificate::{Certificate, Version},
-            CertificateChoices,
-        },
-        content_info::CmsVersion,
-    },
-    der::{asn1::ObjectIdentifier as Oid, DateTime, Decode, Encode},
-    std::time::SystemTime,
+    cms::{cert::CertificateChoices, content_info::CmsVersion},
+    der::{asn1::ObjectIdentifier as Oid, Decode, Encode},
 };
 
 const ID_ICAO_CSCAMLSIGKEY: Oid = Oid::new_unwrap("2.23.136.1.1.3");
 const ID_CE_EXTKEYUSAGE: Oid = Oid::new_unwrap("2.5.29.37");
-
-pub trait PKIProfile {
-    /// Check if `self` is compliant with ICAO 9303-12 7. profiles
-    fn compliance(&self) -> Result<()>;
-}
-
-impl PKIProfile for Certificate {
-    /// Structure checks, per ICAO 9303-12 7., 9.
-    fn compliance(&self) -> Result<()> {
-        let cert = &self.tbs_certificate;
-
-        ensure!(cert.version == Version::V3);
-        ensure!(cert.serial_number.as_bytes().len() <= 20);
-
-        let now = DateTime::from_system_time(SystemTime::now())?;
-        let start = cert.validity.not_before.to_date_time();
-        let end = cert.validity.not_after.to_date_time();
-
-        ensure!(now >= start, "Certificate not valid yet");
-        ensure!(now <= end, "Certificate expired");
-
-        ensure!(
-            cert.issuer_unique_id.is_none(),
-            "Certificate issuerUniqueId must be absent"
-        );
-        ensure!(
-            cert.subject_unique_id.is_none(),
-            "Certificate subjectUniqueId must be absent"
-        );
-        ensure!(
-            cert.extensions.is_some(),
-            "Certificate extensions must be present"
-        );
-
-        Ok(())
-    }
-}
 
 impl MasterList {
     pub fn verify(&self) -> Result<()> {
@@ -85,8 +44,8 @@ impl MasterList {
         let (mut csca_cert, mut master_cert) = (None, None);
         for choice in certificates.iter() {
             if let CertificateChoices::Certificate(cert) = choice {
-                cert.compliance()?;
                 if cert.tbs_certificate.subject == cert.tbs_certificate.issuer {
+                    Certificate::CSCA(cert).compliance()?;
                     csca_cert = Some(cert);
                 } else {
                     // ICAO 9303-12 7.1.1.3
@@ -111,6 +70,7 @@ impl MasterList {
                         "extendedKeyUsage included-OID in Master List Signer certificate not of \
                          CSCA Master List signing key"
                     );
+                    Certificate::MasterListSigner(cert).compliance()?;
                     master_cert = Some(cert);
                 }
             }
@@ -157,7 +117,7 @@ impl MasterList {
 
         let list = self.csca_ml()?;
         for cert in list.cert_list.iter() {
-            cert.compliance()?;
+            Certificate::CSCA(cert).compliance()?;
         }
 
         Ok(())
