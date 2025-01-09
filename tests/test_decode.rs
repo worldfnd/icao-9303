@@ -3,7 +3,7 @@ mod dataset;
 use {
     anyhow::{anyhow as err, bail, ensure, Result},
     cms::content_info::CmsVersion,
-    dataset::Dataset,
+    dataset::{BSIDataset, DEPKI},
     der::Decode,
     icao_9303::asn1::{
         emrtd::{
@@ -17,7 +17,7 @@ use {
 
 #[test]
 fn test_decode_dg14() -> Result<()> {
-    let dataset = Dataset::load()?;
+    let dataset = BSIDataset::load()?;
     let dg14 = EfDg14::from_der(&dataset.dg14)?;
 
     assert_eq!(dg14.0 .0.len(), 3);
@@ -51,7 +51,7 @@ fn test_decode_dg14() -> Result<()> {
 
 #[test]
 fn test_decode_sod() -> Result<()> {
-    let dataset = Dataset::load()?;
+    let dataset = BSIDataset::load()?;
     let sod = EfSod::from_der(&dataset.sod)?;
 
     // SecurityObject
@@ -82,8 +82,8 @@ fn test_decode_sod() -> Result<()> {
 
 #[test]
 fn test_decode_master_list() -> Result<()> {
-    let dataset = Dataset::load()?;
-    let ml = MasterList::from_der(&dataset.master_list)?;
+    let dataset = DEPKI::load()?;
+    let ml = MasterList::from_der(&dataset.ml)?;
     let csca_ml = ml.csca_ml()?;
 
     ensure!(csca_ml.version == 0);
