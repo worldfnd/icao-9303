@@ -62,13 +62,18 @@ impl BSIDataset {
     }
 }
 
+/// German PKI CSCA certifiates
+///
+/// Fetched from the official [BSI website](https://www.bsi.bund.de/EN/Themen/Oeffentliche-Verwaltung/Elektronische-Identitaeten/Public-Key-Infrastrukturen/CSCA/Root_Cert_Germany/Root_Certificate_node.html).
 pub struct DEPKI {
+    /// CSCA certificate
+    pub csca: Vec<u8>,
     /// Master List
-    pub ml:  Vec<u8>,
+    pub ml:   Vec<u8>,
     /// Deviation List
-    pub dvl: Vec<u8>,
+    pub dvl:  Vec<u8>,
     /// Certificate Revocation List
-    pub crl: Vec<u8>,
+    pub crl:  Vec<u8>,
 }
 
 impl DEPKI {
@@ -76,8 +81,9 @@ impl DEPKI {
         let ml = read_binfile("tests/DE/DE_ML_2024-12-19-10-09-11.ml")?;
         let dvl = read_binfile("tests/DE/20181106_DEDeviationList.dvl")?;
         let crl = read_binfile("tests/DE/DE_CRL.crl")?;
+        let csca = read_binfile("tests/DE/[ROOT-CA]_CSCA07.cer")?;
 
-        Ok(Self { ml, dvl, crl })
+        Ok(Self { csca, ml, dvl, crl })
     }
 }
 

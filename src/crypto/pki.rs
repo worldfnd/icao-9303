@@ -3,11 +3,11 @@
 use {
     crate::{
         asn1::{
-            emrtd::pki::{ExtendedKeyUsage, MasterList},
+            emrtd::pki::{ExtendedKeyUsage, MasterList, CRL},
             SignatureAlgorithmIdentifier,
         },
         crypto::{
-            certificate::{Certificate, EmrtdPKIProfile},
+            certificate::{Certificate, EmrtdPKIProfile, X509},
             public_key::PublicKey,
         },
     },
@@ -120,6 +120,25 @@ impl MasterList {
             // Some certificates are not fully compliant
             // Certificate::CSCA(cert).compliance()?;
         }
+
+        Ok(())
+    }
+}
+
+impl CRL {
+    pub fn verify<C: X509>(&self, issuer: &Certificate<C>) -> Result<()> {
+        let crl = &self.0;
+
+        let message = crl.tbs_cert_list.to_der()?;
+        let signature = crl
+            .signature
+            .as_bytes()
+            .ok_or_else(|| anyhow!("Failed getting signature BIT STRING as bytes"))?;
+        let signature_algo = SignatureAlgorithmIdentifier::try_from(&crl.signature_algorithm)?;
+
+        issuer
+            .public_key()?
+            .verify(&message, signature, &signature_algo)?;
 
         Ok(())
     }

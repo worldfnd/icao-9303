@@ -96,7 +96,7 @@ fn test_decode_crl() -> Result<()> {
     let dataset = DEPKI::load()?;
     let crl = CRL::from_der(&dataset.crl)?;
 
-    let _sig_algo = SignatureAlgorithmIdentifier::from_der(&crl.signature_algorithm.to_der()?);
+    let _sig_algo = SignatureAlgorithmIdentifier::from_der(&crl.0.signature_algorithm.to_der()?);
 
     Ok(())
 }

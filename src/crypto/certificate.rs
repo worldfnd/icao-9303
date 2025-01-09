@@ -1,6 +1,7 @@
 use {
+    super::public_key::PublicKey,
     anyhow::{anyhow, bail, ensure, Result},
-    cms::cert::x509::certificate::{CertificateInner as X509Certificate, Version},
+    cms::cert::x509::certificate::{CertificateInner, Version},
     der::{asn1::ObjectIdentifier as Oid, DateTime, Decode, Encode},
     std::time::SystemTime,
 };
@@ -38,8 +39,14 @@ pub enum Certificate<C> {
     Communication(C),
 }
 
+pub type X509Certificate = CertificateInner;
+
+/// Helper trait to handle X509 certificates
 pub trait X509 {
+    /// Fetch the X509 certificate
     fn x509(&self) -> &X509Certificate;
+    /// Spawn a cryptographic subject public key
+    fn public_key(&self) -> Result<PublicKey>;
 }
 
 impl<C: X509> X509 for Certificate<C> {
@@ -53,17 +60,36 @@ impl<C: X509> X509 for Certificate<C> {
             Self::Communication(cert) => cert.x509(),
         }
     }
+
+    fn public_key(&self) -> Result<PublicKey> {
+        match self {
+            Self::CSCA(cert) => cert.public_key(),
+            Self::CSCALink(cert) => cert.public_key(),
+            Self::DocumentSigner(cert) => cert.public_key(),
+            Self::MasterListSigner(cert) => cert.public_key(),
+            Self::DeviationListSigner(cert) => cert.public_key(),
+            Self::Communication(cert) => cert.public_key(),
+        }
+    }
 }
 
 impl X509 for X509Certificate {
     fn x509(&self) -> &X509Certificate {
         self
     }
+
+    fn public_key(&self) -> Result<PublicKey> {
+        PublicKey::try_from(&self.tbs_certificate.subject_public_key_info)
+    }
 }
 
 impl X509 for &X509Certificate {
     fn x509(&self) -> &X509Certificate {
         self
+    }
+
+    fn public_key(&self) -> Result<PublicKey> {
+        (*self).public_key()
     }
 }
 
