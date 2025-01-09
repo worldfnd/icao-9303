@@ -8,18 +8,17 @@ use {
 };
 
 /// Raw BSI TR-03105-5 ReferenceDataSet.
-pub struct Dataset {
-    pub dg1:         Vec<u8>,
-    pub dg2:         Vec<u8>,
-    pub dg3:         Vec<u8>,
-    pub dg4:         Vec<u8>,
-    pub dg14:        Vec<u8>,
-    pub dg15:        Vec<u8>,
-    pub com:         Vec<u8>,
-    pub sod:         Vec<u8>,
-    pub dg14_keys:   Keypair,
-    pub dg15_keys:   Keypair,
-    pub master_list: Vec<u8>,
+pub struct BSIDataset {
+    pub dg1:       Vec<u8>,
+    pub dg2:       Vec<u8>,
+    pub dg3:       Vec<u8>,
+    pub dg4:       Vec<u8>,
+    pub dg14:      Vec<u8>,
+    pub dg15:      Vec<u8>,
+    pub com:       Vec<u8>,
+    pub sod:       Vec<u8>,
+    pub dg14_keys: Keypair,
+    pub dg15_keys: Keypair,
 }
 
 /// Public-private key pair.
@@ -28,27 +27,25 @@ pub struct Keypair {
     pub sk: Vec<u8>,
 }
 
-impl Dataset {
+impl BSIDataset {
     pub fn load() -> Result<Self> {
-        let dg1 = Self::read_binfile("tests/dataset/Datagroup1.bin")?;
-        let dg2 = Self::read_binfile("tests/dataset/Datagroup2.bin")?;
-        let dg3 = Self::read_binfile("tests/dataset/Datagroup3.bin")?;
-        let dg4 = Self::read_binfile("tests/dataset/Datagroup4.bin")?;
-        let dg14 = Self::read_binfile("tests/dataset/Datagroup14.bin")?;
-        let dg15 = Self::read_binfile("tests/dataset/Datagroup15.bin")?;
-        let com = Self::read_binfile("tests/dataset/EF_COM.bin")?;
-        let sod = Self::read_binfile("tests/dataset/EF_SOD.bin")?;
+        let dg1 = read_binfile("tests/dataset/Datagroup1.bin")?;
+        let dg2 = read_binfile("tests/dataset/Datagroup2.bin")?;
+        let dg3 = read_binfile("tests/dataset/Datagroup3.bin")?;
+        let dg4 = read_binfile("tests/dataset/Datagroup4.bin")?;
+        let dg14 = read_binfile("tests/dataset/Datagroup14.bin")?;
+        let dg15 = read_binfile("tests/dataset/Datagroup15.bin")?;
+        let com = read_binfile("tests/dataset/EF_COM.bin")?;
+        let sod = read_binfile("tests/dataset/EF_SOD.bin")?;
 
         let dg14_keys = Keypair {
-            pk: Self::read_binfile("tests/dataset/DG14_pk.bin")?,
-            sk: Self::read_binfile("tests/dataset/DG14_sk.pkcs8")?,
+            pk: read_binfile("tests/dataset/DG14_pk.bin")?,
+            sk: read_binfile("tests/dataset/DG14_sk.pkcs8")?,
         };
         let dg15_keys = Keypair {
-            pk: Self::read_binfile("tests/dataset/DG15_pk.bin")?,
-            sk: Self::read_binfile("tests/dataset/DG15_sk.pkcs8")?,
+            pk: read_binfile("tests/dataset/DG15_pk.bin")?,
+            sk: read_binfile("tests/dataset/DG15_sk.pkcs8")?,
         };
-
-        let master_list = Self::read_binfile("DE_ML_2024-12-19-10-09-11.ml")?;
 
         Ok(Self {
             dg1,
@@ -61,14 +58,32 @@ impl Dataset {
             sod,
             dg14_keys,
             dg15_keys,
-            master_list,
         })
     }
+}
 
-    fn read_binfile(path: impl AsRef<Path>) -> Result<Vec<u8>> {
-        let mut file = File::open(path)?;
-        let mut buffer = Vec::new();
-        file.read_to_end(&mut buffer)?;
-        Ok(buffer)
+pub struct DEPKI {
+    /// Master List
+    pub ml:  Vec<u8>,
+    /// Deviation List
+    pub dvl: Vec<u8>,
+    /// Certificate Revocation List
+    pub crl: Vec<u8>,
+}
+
+impl DEPKI {
+    pub fn load() -> Result<Self> {
+        let ml = read_binfile("tests/DE/DE_ML_2024-12-19-10-09-11.ml")?;
+        let dvl = read_binfile("tests/DE/20181106_DEDeviationList.dvl")?;
+        let crl = read_binfile("tests/DE/DE_CRL.crl")?;
+
+        Ok(Self { ml, dvl, crl })
     }
+}
+
+fn read_binfile(path: impl AsRef<Path>) -> Result<Vec<u8>> {
+    let mut file = File::open(path)?;
+    let mut buffer = Vec::new();
+    file.read_to_end(&mut buffer)?;
+    Ok(buffer)
 }
