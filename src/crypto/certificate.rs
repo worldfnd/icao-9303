@@ -5,7 +5,28 @@ use {
     std::time::SystemTime,
 };
 
+const ID_CE_SUBJECTDIRECTORYATTRIBUTES: Oid = Oid::new_unwrap("2.5.29.9");
 const ID_CE_SUBJECTKEYIDENTIFIER: Oid = Oid::new_unwrap("2.5.29.14");
+const ID_CE_KEYUSAGE: Oid = Oid::new_unwrap("2.5.29.15");
+const ID_CE_PRIVATEKEYUSAGEPERIOD: Oid = Oid::new_unwrap("2.5.29.16");
+const ID_CE_SUBJECTALTNAME: Oid = Oid::new_unwrap("2.5.29.17");
+const ID_CE_ISSUERALTNAME: Oid = Oid::new_unwrap("2.5.29.18");
+const ID_CE_BASICCONSTRAINTS: Oid = Oid::new_unwrap("2.5.29.19");
+const ID_CE_NAMECONSTRAINTS: Oid = Oid::new_unwrap("2.5.29.30");
+const ID_CE_CRLDISTRIBUTIONPOINTS: Oid = Oid::new_unwrap("2.5.29.31");
+const ID_CE_CERTIFICATEPOLICIES: Oid = Oid::new_unwrap("2.5.29.32");
+const ID_CE_POLICYMAPPINGS: Oid = Oid::new_unwrap("2.5.29.33");
+const ID_CE_AUTHORITYKEYIDENTIFIER: Oid = Oid::new_unwrap("2.5.29.35");
+const ID_CE_POLICYCONSTRAINTS: Oid = Oid::new_unwrap("2.5.29.36");
+const ID_CE_EXTKEYUSAGE: Oid = Oid::new_unwrap("2.5.29.37");
+const ID_CE_FRESHESTCRL: Oid = Oid::new_unwrap("2.5.29.46");
+const ID_CE_INHIBITANYPOLICY: Oid = Oid::new_unwrap("2.5.29.54");
+
+const ID_NS_NETSCAPECERTIFICATETYPE: Oid = Oid::new_unwrap("2.16.840.1.113730.1.1");
+
+const ID_ICAO_EXTENSIONS: Oid = Oid::new_unwrap("2.23.136.1.1.6");
+const ID_ICAO_EXT_NAMECHANGE: Oid = Oid::new_unwrap("2.23.136.1.1.6.1");
+const ID_ICAO_EXT_DOCUMENTTYPELIST: Oid = Oid::new_unwrap("2.23.136.1.1.6.2");
 
 #[derive(Clone, Debug)]
 pub enum Certificate<C> {
@@ -80,19 +101,237 @@ impl<C: X509> EmrtdPKIProfile for Certificate<C> {
         };
 
         // Extensions
-        // subjectKeyIdentifier
-        match self {
-            Self::CSCA(cert) | Self::CSCALink(cert) => {
-                let extensions = cert.x509().tbs_certificate.extensions.as_ref().unwrap();
+        enum Requirement {
+            Present,
+            Absent,
+            Optional,
+        }
+        let check_ext = |oid: &Oid, req: Requirement| -> Result<()> {
+            let present = extensions.iter().any(|ext| ext.extn_id == *oid);
+            match (req, present) {
+                (Requirement::Present, false) => bail!("Certificate extensions must include {oid}"),
+                (Requirement::Absent, true) => {
+                    bail!("Certificate extensions must not include {oid}")
+                }
+                _ => Ok(()),
+            }
+        };
 
-                extensions
-                    .iter()
-                    .find(|ext| ext.extn_id == ID_CE_SUBJECTKEYIDENTIFIER)
-                    .ok_or_else(|| {
-                        anyhow!("Certificate extensions must include subjectKeyIdentifier")
-                    })?;
+        // AuthorityKeyIdentifier
+        match self {
+            Self::CSCALink(_)
+            | Self::DocumentSigner(_)
+            | Self::MasterListSigner(_)
+            | Self::DeviationListSigner(_)
+            | Self::Communication(_) => {
+                check_ext(&ID_CE_AUTHORITYKEYIDENTIFIER, Requirement::Present)?;
             }
             _ => (),
+        }
+
+        // SubjectKeyIdentifier
+        match self {
+            Self::CSCA(_) | Self::CSCALink(_) => {
+                check_ext(&ID_CE_SUBJECTKEYIDENTIFIER, Requirement::Present)?;
+            }
+            _ => (),
+        }
+
+        // KeyUsage
+        match self {
+            Self::CSCA(_)
+            | Self::CSCALink(_)
+            | Self::DocumentSigner(_)
+            | Self::MasterListSigner(_)
+            | Self::DeviationListSigner(_)
+            | Self::Communication(_) => {
+                check_ext(&ID_CE_KEYUSAGE, Requirement::Present)?;
+            }
+        }
+
+        // PrivateKeyUsagePeriod
+        match self {
+            Self::CSCA(_) | Self::CSCALink(_) | Self::DocumentSigner(_) => {
+                check_ext(&ID_CE_PRIVATEKEYUSAGEPERIOD, Requirement::Present)?;
+            }
+            _ => (),
+        }
+
+        // CertificatePolicies
+        match self {
+            _ => (),
+        }
+
+        // PolicyMappings
+        match self {
+            Self::CSCA(_)
+            | Self::CSCALink(_)
+            | Self::DocumentSigner(_)
+            | Self::MasterListSigner(_)
+            | Self::DeviationListSigner(_)
+            | Self::Communication(_) => {
+                check_ext(&ID_CE_POLICYMAPPINGS, Requirement::Absent)?;
+            }
+        }
+
+        // IssuerAltName
+        match self {
+            Self::CSCA(_)
+            | Self::CSCALink(_)
+            | Self::DocumentSigner(_)
+            | Self::MasterListSigner(_)
+            | Self::DeviationListSigner(_)
+            | Self::Communication(_) => {
+                check_ext(&ID_CE_ISSUERALTNAME, Requirement::Present)?;
+            }
+        }
+
+        // SubjectAltname
+        match self {
+            Self::CSCA(_)
+            | Self::CSCALink(_)
+            | Self::DocumentSigner(_)
+            | Self::MasterListSigner(_)
+            | Self::DeviationListSigner(_)
+            | Self::Communication(_) => {
+                check_ext(&ID_CE_SUBJECTALTNAME, Requirement::Present)?;
+            }
+        }
+
+        // SubjectDirectoryAttributes
+        match self {
+            Self::CSCA(_)
+            | Self::CSCALink(_)
+            | Self::DocumentSigner(_)
+            | Self::MasterListSigner(_)
+            | Self::DeviationListSigner(_)
+            | Self::Communication(_) => {
+                check_ext(&ID_CE_SUBJECTDIRECTORYATTRIBUTES, Requirement::Absent)?;
+            }
+        }
+
+        // BasicConstraints
+        match self {
+            Self::CSCA(_) | Self::CSCALink(_) => {
+                check_ext(&ID_CE_BASICCONSTRAINTS, Requirement::Present)?;
+            }
+            Self::DocumentSigner(_)
+            | Self::MasterListSigner(_)
+            | Self::DeviationListSigner(_)
+            | Self::Communication(_) => {
+                check_ext(&ID_CE_BASICCONSTRAINTS, Requirement::Absent)?;
+            }
+        }
+
+        // NameConstraints
+        match self {
+            Self::CSCA(_)
+            | Self::CSCALink(_)
+            | Self::DocumentSigner(_)
+            | Self::MasterListSigner(_)
+            | Self::DeviationListSigner(_)
+            | Self::Communication(_) => {
+                check_ext(&ID_CE_NAMECONSTRAINTS, Requirement::Absent)?;
+            }
+        }
+
+        // PolicyConstraints
+        match self {
+            Self::CSCA(_)
+            | Self::CSCALink(_)
+            | Self::DocumentSigner(_)
+            | Self::MasterListSigner(_)
+            | Self::DeviationListSigner(_)
+            | Self::Communication(_) => {
+                check_ext(&ID_CE_POLICYCONSTRAINTS, Requirement::Absent)?;
+            }
+        }
+
+        // ExtKeyUsage
+        match self {
+            Self::CSCA(_) | Self::CSCALink(_) | Self::DocumentSigner(_) => {
+                check_ext(&ID_CE_EXTKEYUSAGE, Requirement::Absent)?;
+            }
+            Self::MasterListSigner(_) | Self::DeviationListSigner(_) | Self::Communication(_) => {
+                check_ext(&ID_CE_EXTKEYUSAGE, Requirement::Present)?;
+            }
+        }
+
+        // CRLDistributionPoints
+        match self {
+            Self::CSCA(_)
+            | Self::CSCALink(_)
+            | Self::DocumentSigner(_)
+            | Self::MasterListSigner(_)
+            | Self::DeviationListSigner(_) => {
+                check_ext(&ID_CE_CRLDISTRIBUTIONPOINTS, Requirement::Present)?;
+            }
+            Self::Communication(_) => {
+                check_ext(&ID_CE_CRLDISTRIBUTIONPOINTS, Requirement::Optional)?;
+            }
+        }
+
+        // InhibitAnyPolicy
+        match self {
+            Self::CSCA(_)
+            | Self::CSCALink(_)
+            | Self::DocumentSigner(_)
+            | Self::MasterListSigner(_)
+            | Self::DeviationListSigner(_)
+            | Self::Communication(_) => {
+                check_ext(&ID_CE_INHIBITANYPOLICY, Requirement::Absent)?;
+            }
+        }
+
+        // FreshestCRL
+        match self {
+            Self::CSCA(_)
+            | Self::CSCALink(_)
+            | Self::DocumentSigner(_)
+            | Self::MasterListSigner(_)
+            | Self::DeviationListSigner(_)
+            | Self::Communication(_) => {
+                check_ext(&ID_CE_FRESHESTCRL, Requirement::Absent)?;
+            }
+        }
+
+        // NameChange
+        match self {
+            Self::CSCA(_) | Self::CSCALink(_) => {
+                check_ext(&ID_ICAO_EXT_NAMECHANGE, Requirement::Optional)?;
+            }
+            Self::DocumentSigner(_)
+            | Self::MasterListSigner(_)
+            | Self::DeviationListSigner(_)
+            | Self::Communication(_) => {
+                check_ext(&ID_ICAO_EXT_NAMECHANGE, Requirement::Absent)?;
+            }
+        }
+
+        // DocumentType
+        match self {
+            Self::CSCA(_)
+            | Self::CSCALink(_)
+            | Self::MasterListSigner(_)
+            | Self::DeviationListSigner(_)
+            | Self::Communication(_) => {
+                check_ext(&ID_ICAO_EXT_DOCUMENTTYPELIST, Requirement::Absent)?;
+            }
+            Self::DocumentSigner(_) => {
+                check_ext(&ID_ICAO_EXT_DOCUMENTTYPELIST, Requirement::Present)?;
+            }
+        }
+
+        // NetscapeCertificateType
+        match self {
+            Self::CSCA(_)
+            | Self::CSCALink(_)
+            | Self::DocumentSigner(_)
+            | Self::MasterListSigner(_)
+            | Self::DeviationListSigner(_)
+            | Self::Communication(_) => {
+                check_ext(&ID_NS_NETSCAPECERTIFICATETYPE, Requirement::Absent)?;
+            }
         }
 
         Ok(())
