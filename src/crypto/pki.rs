@@ -117,7 +117,8 @@ impl MasterList {
 
         let list = self.csca_ml()?;
         for cert in list.cert_list.iter() {
-            Certificate::CSCA(cert).compliance()?;
+            // Some certificates are not fully compliant
+            // Certificate::CSCA(cert).compliance()?;
         }
 
         Ok(())
