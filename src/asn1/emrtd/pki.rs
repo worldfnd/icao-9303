@@ -2,7 +2,7 @@ use {
     super::{ApplicationTagged, ContentInfo, ContentType, DigestAlgorithmIdentifier},
     crate::ensure_err,
     cms::{
-        cert::x509::Certificate,
+        cert::x509::{crl::CertificateList, Certificate},
         signed_data::{EncapsulatedContentInfo, SignedData, SignerInfo},
     },
     der::{
@@ -28,6 +28,8 @@ impl ContentType for CscaMasterList {
     /// ICAO 9303-12 9.2
     const CONTENT_TYPE: Oid = Oid::new_unwrap("2.23.136.1.1.2");
 }
+
+pub type CRL = CertificateList;
 
 #[derive(Clone, Debug, PartialEq, Eq, Sequence)]
 pub struct ExtendedKeyUsage {

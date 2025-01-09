@@ -4,14 +4,14 @@ use {
     anyhow::{anyhow as err, bail, ensure, Result},
     cms::content_info::CmsVersion,
     dataset::{BSIDataset, DEPKI},
-    der::Decode,
+    der::{Decode, Encode},
     icao_9303::asn1::{
         emrtd::{
-            pki::{CscaMasterList, MasterList},
+            pki::{MasterList, CRL},
             security_info::SecurityInfo,
             EfDg14, EfSod,
         },
-        DigestAlgorithmIdentifier,
+        DigestAlgorithmIdentifier, SignatureAlgorithmIdentifier,
     },
 };
 
@@ -87,6 +87,16 @@ fn test_decode_master_list() -> Result<()> {
     let csca_ml = ml.csca_ml()?;
 
     ensure!(csca_ml.version == 0);
+
+    Ok(())
+}
+
+#[test]
+fn test_decode_crl() -> Result<()> {
+    let dataset = DEPKI::load()?;
+    let crl = CRL::from_der(&dataset.crl)?;
+
+    let _sig_algo = SignatureAlgorithmIdentifier::from_der(&crl.signature_algorithm.to_der()?);
 
     Ok(())
 }
