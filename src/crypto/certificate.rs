@@ -1,36 +1,39 @@
 use {
     super::public_key::PublicKey,
     anyhow::{anyhow, bail, ensure, Result},
-    cms::cert::x509::certificate::{CertificateInner, Version},
+    cms::cert::x509::{
+        certificate::{CertificateInner, Version},
+        ext::Extension,
+    },
     der::{asn1::ObjectIdentifier as Oid, DateTime, Decode, Encode},
     std::time::SystemTime,
 };
 
-const ID_CE_SUBJECTDIRECTORYATTRIBUTES: Oid = Oid::new_unwrap("2.5.29.9");
-const ID_CE_SUBJECTKEYIDENTIFIER: Oid = Oid::new_unwrap("2.5.29.14");
-const ID_CE_KEYUSAGE: Oid = Oid::new_unwrap("2.5.29.15");
-const ID_CE_PRIVATEKEYUSAGEPERIOD: Oid = Oid::new_unwrap("2.5.29.16");
-const ID_CE_SUBJECTALTNAME: Oid = Oid::new_unwrap("2.5.29.17");
-const ID_CE_ISSUERALTNAME: Oid = Oid::new_unwrap("2.5.29.18");
-const ID_CE_BASICCONSTRAINTS: Oid = Oid::new_unwrap("2.5.29.19");
-const ID_CE_NAMECONSTRAINTS: Oid = Oid::new_unwrap("2.5.29.30");
-const ID_CE_CRLDISTRIBUTIONPOINTS: Oid = Oid::new_unwrap("2.5.29.31");
-const ID_CE_CERTIFICATEPOLICIES: Oid = Oid::new_unwrap("2.5.29.32");
-const ID_CE_POLICYMAPPINGS: Oid = Oid::new_unwrap("2.5.29.33");
-const ID_CE_AUTHORITYKEYIDENTIFIER: Oid = Oid::new_unwrap("2.5.29.35");
-const ID_CE_POLICYCONSTRAINTS: Oid = Oid::new_unwrap("2.5.29.36");
-const ID_CE_EXTKEYUSAGE: Oid = Oid::new_unwrap("2.5.29.37");
-const ID_CE_FRESHESTCRL: Oid = Oid::new_unwrap("2.5.29.46");
-const ID_CE_INHIBITANYPOLICY: Oid = Oid::new_unwrap("2.5.29.54");
+pub const ID_CE_SUBJECTDIRECTORYATTRIBUTES: Oid = Oid::new_unwrap("2.5.29.9");
+pub const ID_CE_SUBJECTKEYIDENTIFIER: Oid = Oid::new_unwrap("2.5.29.14");
+pub const ID_CE_KEYUSAGE: Oid = Oid::new_unwrap("2.5.29.15");
+pub const ID_CE_PRIVATEKEYUSAGEPERIOD: Oid = Oid::new_unwrap("2.5.29.16");
+pub const ID_CE_SUBJECTALTNAME: Oid = Oid::new_unwrap("2.5.29.17");
+pub const ID_CE_ISSUERALTNAME: Oid = Oid::new_unwrap("2.5.29.18");
+pub const ID_CE_BASICCONSTRAINTS: Oid = Oid::new_unwrap("2.5.29.19");
+pub const ID_CE_NAMECONSTRAINTS: Oid = Oid::new_unwrap("2.5.29.30");
+pub const ID_CE_CRLDISTRIBUTIONPOINTS: Oid = Oid::new_unwrap("2.5.29.31");
+pub const ID_CE_CERTIFICATEPOLICIES: Oid = Oid::new_unwrap("2.5.29.32");
+pub const ID_CE_POLICYMAPPINGS: Oid = Oid::new_unwrap("2.5.29.33");
+pub const ID_CE_AUTHORITYKEYIDENTIFIER: Oid = Oid::new_unwrap("2.5.29.35");
+pub const ID_CE_POLICYCONSTRAINTS: Oid = Oid::new_unwrap("2.5.29.36");
+pub const ID_CE_EXTKEYUSAGE: Oid = Oid::new_unwrap("2.5.29.37");
+pub const ID_CE_FRESHESTCRL: Oid = Oid::new_unwrap("2.5.29.46");
+pub const ID_CE_INHIBITANYPOLICY: Oid = Oid::new_unwrap("2.5.29.54");
 
-const ID_NS_NETSCAPECERTIFICATETYPE: Oid = Oid::new_unwrap("2.16.840.1.113730.1.1");
+pub const ID_NS_NETSCAPECERTIFICATETYPE: Oid = Oid::new_unwrap("2.16.840.1.113730.1.1");
 
-const ID_ICAO_EXTENSIONS: Oid = Oid::new_unwrap("2.23.136.1.1.6");
-const ID_ICAO_EXT_NAMECHANGE: Oid = Oid::new_unwrap("2.23.136.1.1.6.1");
-const ID_ICAO_EXT_DOCUMENTTYPELIST: Oid = Oid::new_unwrap("2.23.136.1.1.6.2");
+pub const ID_ICAO_EXTENSIONS: Oid = Oid::new_unwrap("2.23.136.1.1.6");
+pub const ID_ICAO_EXT_NAMECHANGE: Oid = Oid::new_unwrap("2.23.136.1.1.6.1");
+pub const ID_ICAO_EXT_DOCUMENTTYPELIST: Oid = Oid::new_unwrap("2.23.136.1.1.6.2");
 
 #[derive(Clone, Debug)]
-pub enum Certificate<C> {
+pub enum Certificate<C: X509 = X509Certificate> {
     CSCA(C),
     CSCALink(C),
     DocumentSigner(C),
@@ -45,32 +48,31 @@ pub type X509Certificate = CertificateInner;
 pub trait X509 {
     /// Fetch the X509 certificate
     fn x509(&self) -> &X509Certificate;
-    /// Spawn a cryptographic subject public key
+    /// Spawn the certificate's cryptographic subject public key
     fn public_key(&self) -> Result<PublicKey>;
+    /// Get an extension, if it exists
+    fn extension(&self, oid: &Oid) -> Option<&Extension>;
+}
+
+macro_rules! impl_cert_delegate {
+    ($method:ident $(($($arg:ident: $type:ty),*))? $(-> $ret:ty)?) => {
+        fn $method(&self $($(,$arg: $type)*)?) $(-> $ret)? {
+            match self {
+                Self::CSCA(cert) => cert.$method($($($arg),*)?),
+                Self::CSCALink(cert) => cert.$method($($($arg),*)?),
+                Self::DocumentSigner(cert) => cert.$method($($($arg),*)?),
+                Self::MasterListSigner(cert) => cert.$method($($($arg),*)?),
+                Self::DeviationListSigner(cert) => cert.$method($($($arg),*)?),
+                Self::Communication(cert) => cert.$method($($($arg),*)?),
+            }
+        }
+    };
 }
 
 impl<C: X509> X509 for Certificate<C> {
-    fn x509(&self) -> &X509Certificate {
-        match self {
-            Self::CSCA(cert) => cert.x509(),
-            Self::CSCALink(cert) => cert.x509(),
-            Self::DocumentSigner(cert) => cert.x509(),
-            Self::MasterListSigner(cert) => cert.x509(),
-            Self::DeviationListSigner(cert) => cert.x509(),
-            Self::Communication(cert) => cert.x509(),
-        }
-    }
-
-    fn public_key(&self) -> Result<PublicKey> {
-        match self {
-            Self::CSCA(cert) => cert.public_key(),
-            Self::CSCALink(cert) => cert.public_key(),
-            Self::DocumentSigner(cert) => cert.public_key(),
-            Self::MasterListSigner(cert) => cert.public_key(),
-            Self::DeviationListSigner(cert) => cert.public_key(),
-            Self::Communication(cert) => cert.public_key(),
-        }
-    }
+    impl_cert_delegate!(x509 -> &X509Certificate);
+    impl_cert_delegate!(public_key -> Result<PublicKey>);
+    impl_cert_delegate!(extension(oid: &Oid) -> Option<&Extension>);
 }
 
 impl X509 for X509Certificate {
@@ -81,6 +83,13 @@ impl X509 for X509Certificate {
     fn public_key(&self) -> Result<PublicKey> {
         PublicKey::try_from(&self.tbs_certificate.subject_public_key_info)
     }
+
+    fn extension(&self, oid: &Oid) -> Option<&Extension> {
+        self.tbs_certificate
+            .extensions
+            .as_ref()
+            .and_then(|exts| exts.iter().find(|ext| ext.extn_id == *oid))
+    }
 }
 
 impl X509 for &X509Certificate {
@@ -90,6 +99,10 @@ impl X509 for &X509Certificate {
 
     fn public_key(&self) -> Result<PublicKey> {
         (*self).public_key()
+    }
+
+    fn extension(&self, oid: &Oid) -> Option<&Extension> {
+        (*self).extension(oid)
     }
 }
 
@@ -108,8 +121,12 @@ impl<C: X509> EmrtdPKIProfile for Certificate<C> {
         let start = cert.validity.not_before.to_date_time();
         let end = cert.validity.not_after.to_date_time();
 
-        ensure!(now >= start, "Certificate not valid yet");
-        ensure!(now <= end, "Certificate expired");
+        ensure!(
+            now >= start,
+            "Certificate only valid from {}",
+            start.to_string()
+        );
+        ensure!(now <= end, "Certificate expired on {}", end.to_string());
 
         ensure!(
             cert.issuer_unique_id.is_none(),
@@ -363,3 +380,12 @@ impl<C: X509> EmrtdPKIProfile for Certificate<C> {
         Ok(())
     }
 }
+
+//CRLDistributionPoints ::= SEQUENCE SIZE (1..MAX) OF DistributionPoint
+//DistributionPoint ::= SEQUENCE {
+//     distributionPoint       [0]     DistributionPointName OPTIONAL,
+//     reasons                 [1]     ReasonFlags OPTIONAL,
+//     cRLIssuer               [2]     GeneralNames OPTIONAL }
+//DistributionPointName ::= CHOICE {
+//     fullName                [0]     GeneralNames,
+//     nameRelativeToCRLIssuer [1]     RelativeDistinguishedName }
