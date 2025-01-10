@@ -115,7 +115,7 @@ impl MasterList {
 
         master_pubkey.verify(&message, &signature, &signature_algo)?;
 
-        let list = self.csca_ml()?;
+        let list = self.list()?;
         for cert in list.cert_list.iter() {
             // Some certificates are not fully compliant
             // Certificate::CSCA(cert).compliance()?;
