@@ -6,7 +6,7 @@ use {
     der::Decode,
     icao_9303::{
         asn1::emrtd::{
-            pki::{MasterList, CRL},
+            pki::{DeviationList, MasterList, CRL},
             EfSod,
         },
         crypto::certificate::{Certificate, X509Certificate},
@@ -40,6 +40,18 @@ fn test_verify_crl() -> Result<()> {
     let csca = Certificate::CSCA(X509Certificate::from_der(&dataset.csca)?);
 
     crl.verify(&csca)?;
+
+    Ok(())
+}
+
+#[test]
+#[ignore]
+fn test_verify_deviation_list() -> Result<()> {
+    let dataset = DEPKI::load()?;
+    let dvl = DeviationList::from_der(&dataset.dvl)?;
+
+    // DE DVL included certificate expired
+    dvl.verify()?;
 
     Ok(())
 }
