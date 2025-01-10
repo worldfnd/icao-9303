@@ -7,7 +7,7 @@ use {
     der::{Decode, Encode},
     icao_9303::asn1::{
         emrtd::{
-            pki::{MasterList, CRL},
+            pki::{DeviationList, MasterList, CRL},
             security_info::SecurityInfo,
             EfDg14, EfSod,
         },
@@ -84,7 +84,7 @@ fn test_decode_sod() -> Result<()> {
 fn test_decode_master_list() -> Result<()> {
     let dataset = DEPKI::load()?;
     let ml = MasterList::from_der(&dataset.ml)?;
-    let csca_ml = ml.csca_ml()?;
+    let csca_ml = ml.list()?;
 
     ensure!(csca_ml.version == 0);
 
@@ -97,6 +97,17 @@ fn test_decode_crl() -> Result<()> {
     let crl = CRL::from_der(&dataset.crl)?;
 
     let _sig_algo = SignatureAlgorithmIdentifier::from_der(&crl.0.signature_algorithm.to_der()?);
+
+    Ok(())
+}
+
+#[test]
+fn test_decode_deviation_list() -> Result<()> {
+    let dataset = DEPKI::load()?;
+    let dvl = DeviationList::from_der(&dataset.dvl)?;
+    let list = dvl.list()?;
+
+    ensure!(list.version == 0);
 
     Ok(())
 }
