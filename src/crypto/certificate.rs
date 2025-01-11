@@ -1,11 +1,11 @@
 use {
     super::public_key::PublicKey,
-    anyhow::{anyhow, bail, ensure, Result},
+    anyhow::{bail, ensure, Result},
     cms::cert::x509::{
         certificate::{CertificateInner, Version},
         ext::Extension,
     },
-    der::{asn1::ObjectIdentifier as Oid, DateTime, Decode, Encode},
+    der::{asn1::ObjectIdentifier as Oid, DateTime},
     std::time::SystemTime,
 };
 
@@ -380,12 +380,3 @@ impl<C: X509> EmrtdPKIProfile for Certificate<C> {
         Ok(())
     }
 }
-
-//CRLDistributionPoints ::= SEQUENCE SIZE (1..MAX) OF DistributionPoint
-//DistributionPoint ::= SEQUENCE {
-//     distributionPoint       [0]     DistributionPointName OPTIONAL,
-//     reasons                 [1]     ReasonFlags OPTIONAL,
-//     cRLIssuer               [2]     GeneralNames OPTIONAL }
-//DistributionPointName ::= CHOICE {
-//     fullName                [0]     GeneralNames,
-//     nameRelativeToCRLIssuer [1]     RelativeDistinguishedName }

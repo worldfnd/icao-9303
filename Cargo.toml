@@ -59,6 +59,7 @@ num-traits = "0.2.19"
 num_enum = "0.7.3"
 pcsc = { version = "2.9", optional = true }
 rand = "0.8.5"
+reqwest = { version = "0.12", features = ["blocking"] }
 ruint = { version = "1.12.4", features = [
     "rand",
     "subtle",
