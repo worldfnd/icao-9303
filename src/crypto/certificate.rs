@@ -1,12 +1,12 @@
 use {
     super::public_key::PublicKey,
-    anyhow::{bail, ensure, Result},
+    anyhow::{anyhow, bail, ensure, Result},
     cms::cert::x509::{
         certificate::{CertificateInner, Version},
-        ext::Extension,
+        ext::{pkix::BasicConstraints, Extension},
     },
-    der::{asn1::ObjectIdentifier as Oid, DateTime},
-    std::time::SystemTime,
+    der::{asn1::ObjectIdentifier as Oid, DateTime, Decode},
+    std::{fmt, time::SystemTime},
 };
 
 pub const ID_CE_SUBJECTDIRECTORYATTRIBUTES: Oid = Oid::new_unwrap("2.5.29.9");
@@ -73,6 +73,20 @@ impl<C: X509> X509 for Certificate<C> {
     impl_cert_delegate!(x509 -> &X509Certificate);
     impl_cert_delegate!(public_key -> Result<PublicKey>);
     impl_cert_delegate!(extension(oid: &Oid) -> Option<&Extension>);
+}
+
+impl<C: X509> fmt::Display for Certificate<C> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let name = match self {
+            Self::CSCA(_) => "CSCA",
+            Self::CSCALink(_) => "CSCA Link",
+            Self::DocumentSigner(_) => "Document Signer",
+            Self::MasterListSigner(_) => "Master List Signer",
+            Self::DeviationListSigner(_) => "Deviation List Signer",
+            Self::Communication(_) => "Communication",
+        };
+        write!(f, "{name} certificate")
+    }
 }
 
 impl X509 for X509Certificate {
@@ -255,8 +269,19 @@ impl<C: X509> EmrtdPKIProfile for Certificate<C> {
 
         // BasicConstraints
         match self {
-            Self::CSCA(_) | Self::CSCALink(_) => {
-                check_ext(&ID_CE_BASICCONSTRAINTS, Requirement::Present)?;
+            Self::CSCA(cert) | Self::CSCALink(cert) => {
+                let ext = cert
+                    .extension(&ID_CE_BASICCONSTRAINTS)
+                    .ok_or_else(|| anyhow!("{self} extensions must include BasicConstraints"))?;
+                let cts = BasicConstraints::from_der(ext.extn_value.as_bytes())?;
+                ensure!(
+                    cts.ca,
+                    "{self} extension BasicConstraints must be labelled as CA"
+                );
+                ensure!(
+                    cts.path_len_constraint.unwrap_or(0) == 0,
+                    "{self} extension BasicConstraints path length must be 0"
+                );
             }
             Self::DocumentSigner(_)
             | Self::MasterListSigner(_)
