@@ -5,13 +5,16 @@ use {
     cms::content_info::CmsVersion,
     dataset::{BSIDataset, DEPKI},
     der::{Decode, Encode},
-    icao_9303::asn1::{
-        emrtd::{
-            pki::{DeviationList, MasterList, CRL},
-            security_info::SecurityInfo,
-            EfDg14, EfSod,
+    icao_9303::{
+        asn1::{
+            emrtd::{
+                pki::{DeviationList, MasterList, CRL},
+                security_info::SecurityInfo,
+                EfDg14, EfSod,
+            },
+            DigestAlgorithmIdentifier, SignatureAlgorithmIdentifier,
         },
-        DigestAlgorithmIdentifier, SignatureAlgorithmIdentifier,
+        crypto::certificate::{Certificate, X509Certificate},
     },
 };
 
@@ -92,9 +95,20 @@ fn test_decode_master_list() -> Result<()> {
 }
 
 #[test]
-fn test_decode_crl() -> Result<()> {
+fn test_decode_crl_local() -> Result<()> {
     let dataset = DEPKI::load()?;
     let crl = CRL::from_der(&dataset.crl)?;
+
+    let _sig_algo = SignatureAlgorithmIdentifier::from_der(&crl.0.signature_algorithm.to_der()?);
+
+    Ok(())
+}
+
+#[test]
+fn test_decode_crl_online() -> Result<()> {
+    let dataset = DEPKI::load()?;
+    let csca = Certificate::CSCA(X509Certificate::from_der(&dataset.csca)?);
+    let crl = CRL::from_distribution_point(&csca)?;
 
     let _sig_algo = SignatureAlgorithmIdentifier::from_der(&crl.0.signature_algorithm.to_der()?);
 

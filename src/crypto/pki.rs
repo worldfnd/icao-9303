@@ -12,7 +12,16 @@ use {
         },
     },
     anyhow::{anyhow, ensure, Result},
-    cms::{cert::CertificateChoices, content_info::CmsVersion},
+    cms::{
+        cert::{
+            x509::ext::pkix::{
+                name::{DistributionPointName, GeneralName},
+                CrlDistributionPoints,
+            },
+            CertificateChoices,
+        },
+        content_info::CmsVersion,
+    },
     der::{asn1::ObjectIdentifier as Oid, Decode, Encode},
 };
 
@@ -127,6 +136,44 @@ impl MasterList {
 }
 
 impl CRL {
+    /// Fetches a CRL from a distribution point.
+    /// The distribution point URI must be defined in the provided input `cert`.
+    pub fn from_distribution_point(cert: &Certificate) -> Result<Self> {
+        let ext = &cert
+            .extension(&super::certificate::ID_CE_CRLDISTRIBUTIONPOINTS)
+            .ok_or_else(|| {
+                anyhow!("Certificate does not contain CrlDistributionPoint extension")
+            })?;
+        let cdps = CrlDistributionPoints::from_der(ext.extn_value.as_bytes())?;
+
+        let uri = cdps
+            .0
+            .iter()
+            .find_map(|dp| {
+                dp.distribution_point.as_ref().and_then(|dpn| match dpn {
+                    DistributionPointName::FullName(names) => {
+                        for name in names.iter() {
+                            match name {
+                                GeneralName::UniformResourceIdentifier(s) => {
+                                    return Some(s.to_string());
+                                }
+                                // TODO
+                                _ => (),
+                            }
+                        }
+                        None
+                    }
+                    // TODO
+                    DistributionPointName::NameRelativeToCRLIssuer(_) => None,
+                })
+            })
+            .ok_or_else(|| anyhow!("URI not found in CRL distribution points"))?;
+
+        let resp = reqwest::blocking::get(&uri)?.bytes()?;
+
+        Ok(CRL::from_der(&resp)?)
+    }
+
     pub fn verify<C: X509>(&self, issuer: &Certificate<C>) -> Result<()> {
         let crl = &self.0;
 
