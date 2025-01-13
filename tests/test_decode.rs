@@ -105,10 +105,19 @@ fn test_decode_crl_local() -> Result<()> {
 }
 
 #[test]
-fn test_decode_crl_online() -> Result<()> {
+fn test_decode_crl_online_from_cert() -> Result<()> {
     let dataset = DEPKI::load()?;
     let csca = Certificate::CSCA(X509Certificate::from_der(&dataset.csca)?);
     let crl = CRL::from_distribution_point(&csca)?;
+
+    let _sig_algo = SignatureAlgorithmIdentifier::from_der(&crl.0.signature_algorithm.to_der()?);
+
+    Ok(())
+}
+
+#[test]
+fn test_decode_crl_online_from_pkd() -> Result<()> {
+    let crl = CRL::from_pkd("SGP")?; // Singapore CRL
 
     let _sig_algo = SignatureAlgorithmIdentifier::from_der(&crl.0.signature_algorithm.to_der()?);
 
