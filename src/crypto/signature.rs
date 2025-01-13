@@ -2,13 +2,18 @@
 
 use {
     crate::{
-        asn1::{emrtd::EfSod, public_key_info::SubjectPublicKeyInfo, SignatureAlgorithmIdentifier},
+        asn1::{
+            emrtd::EfSod, public_key_info::SubjectPublicKeyInfo, DigestAlgorithmIdentifier,
+            SignatureAlgorithmIdentifier,
+        },
         crypto::public_key::PublicKey,
     },
     anyhow::{anyhow, ensure, Result},
     cms::{cert::CertificateChoices, content_info::CmsVersion},
-    der::Encode,
+    der::{asn1::ObjectIdentifier as Oid, Decode, Encode},
 };
+
+const ID_MESSAGEDIGEST: Oid = Oid::new_unwrap("1.2.840.113549.1.9.4");
 
 impl EfSod {
     /// Verify the signature of the SOD
@@ -59,6 +64,30 @@ impl EfSod {
             .as_ref()
             .ok_or_else(|| anyhow!("SignedData must contain the signedAttrs field"))?;
         let attrs_der = attrs.to_der()?;
+
+        // Check if signed hash is of LDS
+        let lds = self.lds_security_object()?;
+        let digest_algo = DigestAlgorithmIdentifier::from_der(
+            &self
+                .signed_data()
+                .digest_algorithms
+                .iter()
+                .next()
+                .ok_or_else(|| anyhow!("SignedData must contain a digest algorithm"))?
+                .to_der()?,
+        )?;
+        let lds_hash = digest_algo.hash_der(&lds);
+        let signed_digest = attrs
+            .iter()
+            .find(|attr| attr.oid == ID_MESSAGEDIGEST)
+            .ok_or_else(|| anyhow!("Message digest not found in SignedAttrs"))?
+            .values
+            .iter()
+            .next()
+            .ok_or_else(|| anyhow!("SignedAttrs message digest values are empty"))?
+            .value();
+
+        ensure!(signed_digest == lds_hash, "Signed hash not of LDS");
 
         // Signature
         let signature = signer.signature.as_bytes();
