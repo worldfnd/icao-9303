@@ -7,6 +7,7 @@ use {
             SignatureAlgorithmIdentifier,
         },
         crypto::public_key::PublicKey,
+        emrtd::{FileId, HasFileId},
     },
     anyhow::{anyhow, ensure, Result},
     cms::{cert::CertificateChoices, content_info::CmsVersion},
@@ -16,6 +17,33 @@ use {
 const ID_MESSAGEDIGEST: Oid = Oid::new_unwrap("1.2.840.113549.1.9.4");
 
 impl EfSod {
+    /// Check if the provided file is included in the SOD (and is therefore
+    /// signed)
+    pub fn contains_file<F: HasFileId + Encode>(&self, file: &F) -> Result<()> {
+        self.contains_file_bin(&file.to_der()?, F::FILE_ID)
+    }
+
+    /// Check if the provided file (as DER bytes) is included in the SOD (and is
+    /// therefore signed)
+    pub fn contains_file_bin(&self, file: &[u8], id: FileId) -> Result<()> {
+        let lds = self.lds_security_object()?;
+        let sod_hash = lds
+            .data_group_hash_values
+            .iter()
+            .find(|dgh| dgh.data_group_number == id.short_id() as u64)
+            .ok_or_else(|| anyhow!("File {} not included in SOD", id.short_id()))?
+            .hash_value
+            .as_bytes();
+        let file_hash = lds.hash_algorithm.hash_bytes(file);
+
+        ensure!(
+            sod_hash == file_hash,
+            "Provided file {}'s hash and signed hash do not match",
+            id.short_id()
+        );
+
+        Ok(())
+    }
     /// Verify the signature of the SOD
     pub fn verify_signature(&self) -> Result<()> {
         let signer = self.signer_info();
