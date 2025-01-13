@@ -174,6 +174,20 @@ impl CRL {
         Ok(CRL::from_der(&resp)?)
     }
 
+    /// Fetches a country' CRL from the PKD.
+    pub fn from_pkd(country_code: &str) -> Result<Self> {
+        // Try from link1, then link2 if failed
+        let url1 = format!("https://pkddownload1.icao.int/CRLs/{}.crl", country_code);
+        let url2 = format!("https://pkddownload2.icao.int/CRLs/{}.crl", country_code);
+
+        let resp = match reqwest::blocking::get(&url1) {
+            Ok(resp) => resp.bytes()?,
+            Err(_) => reqwest::blocking::get(&url2)?.bytes()?,
+        };
+
+        Ok(CRL::from_der(&resp)?)
+    }
+
     pub fn verify<C: X509>(&self, issuer: &Certificate<C>) -> Result<()> {
         let crl = &self.0;
 
