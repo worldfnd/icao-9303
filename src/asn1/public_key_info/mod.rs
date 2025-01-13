@@ -105,7 +105,11 @@ impl EncodeValue for SubjectPublicKeyInfo {
     fn value_len(&self) -> Result<Length> {
         match self {
             Self::RSA(_info) => todo!(),
-            Self::EC((_params, _info)) => todo!(),
+            Self::EC((params, info)) => {
+                let algo = PubkeyAlgorithmIdentifier::Ec(params.clone());
+                let key_bits = BitString::new(0, info.point.as_bytes())?;
+                algo.encoded_len()? + key_bits.encoded_len()?
+            }
             Self::Unknown(info) => info.value_len(),
         }
     }
@@ -113,7 +117,10 @@ impl EncodeValue for SubjectPublicKeyInfo {
     fn encode_value(&self, writer: &mut impl Writer) -> Result<()> {
         match self {
             Self::RSA(_info) => todo!(),
-            Self::EC((_params, _info)) => todo!(),
+            Self::EC((params, info)) => {
+                PubkeyAlgorithmIdentifier::Ec(params.clone()).encode(writer)?;
+                BitString::new(0, info.point.as_bytes())?.encode(writer)
+            }
             Self::Unknown(any) => any.encode(writer),
         }
     }

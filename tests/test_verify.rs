@@ -7,7 +7,7 @@ use {
     icao_9303::{
         asn1::emrtd::{
             pki::{DeviationList, MasterList, CRL},
-            EfSod,
+            EfDg14, EfSod,
         },
         crypto::certificate::{Certificate, X509Certificate},
     },
@@ -19,6 +19,18 @@ fn test_verify_sod() -> Result<()> {
     let sod = EfSod::from_der(&dataset.sod)?;
 
     sod.verify_signature()?;
+
+    Ok(())
+}
+
+#[test]
+fn test_verify_dg14() -> Result<()> {
+    let dataset = BSIDataset::load()?;
+    let sod = EfSod::from_der(&dataset.sod)?;
+    let dg14 = EfDg14::from_der(&dataset.dg14)?;
+
+    sod.verify_signature()?;
+    sod.contains_file(&dg14)?;
 
     Ok(())
 }
