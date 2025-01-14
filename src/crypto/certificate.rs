@@ -16,6 +16,7 @@ pub const ID_CE_PRIVATEKEYUSAGEPERIOD: Oid = Oid::new_unwrap("2.5.29.16");
 pub const ID_CE_SUBJECTALTNAME: Oid = Oid::new_unwrap("2.5.29.17");
 pub const ID_CE_ISSUERALTNAME: Oid = Oid::new_unwrap("2.5.29.18");
 pub const ID_CE_BASICCONSTRAINTS: Oid = Oid::new_unwrap("2.5.29.19");
+pub const ID_CE_CERTIFICATEISSUER: Oid = Oid::new_unwrap("2.5.29.29");
 pub const ID_CE_NAMECONSTRAINTS: Oid = Oid::new_unwrap("2.5.29.30");
 pub const ID_CE_CRLDISTRIBUTIONPOINTS: Oid = Oid::new_unwrap("2.5.29.31");
 pub const ID_CE_CERTIFICATEPOLICIES: Oid = Oid::new_unwrap("2.5.29.32");
@@ -117,6 +118,22 @@ impl X509 for &X509Certificate {
 
     fn extension(&self, oid: &Oid) -> Option<&Extension> {
         (*self).extension(oid)
+    }
+}
+
+impl<C: X509 + Clone> Certificate<&C>
+where
+    for<'a> &'a C: X509,
+{
+    pub fn into_owned(&self) -> Certificate<C> {
+        match self {
+            Self::CSCA(cert) => Certificate::CSCA((*cert).clone()),
+            Self::CSCALink(cert) => Certificate::CSCALink((*cert).clone()),
+            Self::DocumentSigner(cert) => Certificate::DocumentSigner((*cert).clone()),
+            Self::MasterListSigner(cert) => Certificate::MasterListSigner((*cert).clone()),
+            Self::DeviationListSigner(cert) => Certificate::DeviationListSigner((*cert).clone()),
+            Self::Communication(cert) => Certificate::Communication((*cert).clone()),
+        }
     }
 }
 
