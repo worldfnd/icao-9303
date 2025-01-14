@@ -57,6 +57,17 @@ fn test_verify_crl() -> Result<()> {
 }
 
 #[test]
+fn test_verify_non_revoked() -> Result<()> {
+    let dataset = DEPKI::load()?;
+    let ml = MasterList::from_der(&dataset.ml)?;
+    let crl = CRL::from_der(&dataset.crl)?;
+
+    crl.certificate_status(&ml.signer_certificate()?)?;
+
+    Ok(())
+}
+
+#[test]
 #[ignore]
 fn test_verify_deviation_list() -> Result<()> {
     let dataset = DEPKI::load()?;
