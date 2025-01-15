@@ -7,7 +7,7 @@ mod codec;
 mod ecdsa;
 pub mod groups;
 pub mod mod_ring;
-mod pki;
+pub mod pki;
 pub mod public_key;
 mod rsa;
 pub mod signature;

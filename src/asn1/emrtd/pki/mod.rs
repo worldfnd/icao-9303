@@ -1,3 +1,6 @@
+mod ldif;
+pub mod pkd;
+
 use {
     super::{ContentInfo, ContentType, DigestAlgorithmIdentifier},
     crate::ensure_err,
