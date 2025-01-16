@@ -18,7 +18,7 @@ type U521 = Uint<521, 9>;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PublicKey {
     EC(ECPublicKey<U521>),
-    RSA(RSAPublicKey<U2048>),
+    RSA(RSAPublicKey<U4096>),
 }
 
 impl PublicKey {
@@ -47,7 +47,7 @@ impl PublicKey {
                 key.verify(message, &ecsig, signature_algorithm)
             }
             PublicKey::RSA(key) => {
-                let sigint = U2048::from_be_slice(&signature);
+                let sigint = U4096::from_be_slice(&signature);
                 let rsasig = key.ring.from(sigint);
 
                 key.verify(message, rsasig, signature_algorithm)
