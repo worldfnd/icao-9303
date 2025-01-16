@@ -53,7 +53,7 @@ impl<U: UintMont> RSAPublicKey<U> {
 
         ensure!(signature.ring() == &self.ring);
 
-        let ring_bit_len = self.ring.modulus().bit_len();
+        let ring_bit_len = self.ring.modulus().significant_bits();
         let digest_algo = &params.hash_algorithm;
         let salt_len = params.salt_length.as_bytes()[0] as usize;
         let trailer_field = params.trailer_field.as_bytes()[0] as usize;
@@ -63,8 +63,11 @@ impl<U: UintMont> RSAPublicKey<U> {
         );
 
         let em_elem = signature.pow_ct(self.public_exponent);
-        let em_bytes = em_elem.to_uint().to_be_bytes();
-        let em_len = (self.ring.modulus().bit_len() + 7) / 8;
+        let em_len = (ring_bit_len + 7) / 8;
+        let mut em_bytes = em_elem.to_uint().to_be_bytes();
+        if em_bytes.len() > em_len {
+            em_bytes = em_bytes[em_bytes.len() - em_len..].to_vec();
+        }
 
         // Check trailer (0xBC byte)
         ensure!(
