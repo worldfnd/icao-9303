@@ -8,13 +8,17 @@ use {
     std::cmp::Ordering,
 };
 
-pub const ID_SIG_RSASSA_PSS: Oid = Oid::new_unwrap("1.2.840.113549.1.1.10");
 pub const ID_MGFA_MGF1: Oid = Oid::new_unwrap("1.2.840.113549.1.1.8");
 pub const ID_SIG_ECDSA_SHA1: Oid = Oid::new_unwrap("1.2.840.10045.4.1");
 pub const ID_SIG_ECDSA_SHA224: Oid = Oid::new_unwrap("1.2.840.10045.4.3.1");
 pub const ID_SIG_ECDSA_SHA256: Oid = Oid::new_unwrap("1.2.840.10045.4.3.2");
 pub const ID_SIG_ECDSA_SHA384: Oid = Oid::new_unwrap("1.2.840.10045.4.3.3");
 pub const ID_SIG_ECDSA_SHA512: Oid = Oid::new_unwrap("1.2.840.10045.4.3.4");
+pub const ID_SIG_RSASSA_PSS: Oid = Oid::new_unwrap("1.2.840.113549.1.1.10");
+pub const ID_SIG_RSASSA_PKCS1_SHA1: Oid = Oid::new_unwrap("1.2.840.113549.1.1.5");
+pub const ID_SIG_RSASSA_PKCS1_SHA256: Oid = Oid::new_unwrap("1.2.840.113549.1.1.11");
+pub const ID_SIG_RSASSA_PKCS1_SHA384: Oid = Oid::new_unwrap("1.2.840.113549.1.1.12");
+pub const ID_SIG_RSASSA_PKCS1_SHA512: Oid = Oid::new_unwrap("1.2.840.113549.1.1.13");
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug, Sequence)]
 pub struct EcdsaSigValue {
@@ -24,12 +28,16 @@ pub struct EcdsaSigValue {
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub enum SignatureAlgorithmIdentifier {
-    RsaPss(RsaPssParameters),
     EcdsaSha1,
     EcdsaSha224,
     EcdsaSha256,
     EcdsaSha384,
     EcdsaSha512,
+    RsaPkcsSha1,
+    RsaPkcsSha256,
+    RsaPkcsSha384,
+    RsaPkcsSha512,
+    RsaPss(RsaPssParameters),
     Unknown(AnyAlgorithmIdentifier),
 }
 
@@ -64,7 +72,6 @@ impl<'a> DecodeValue<'a> for SignatureAlgorithmIdentifier {
     fn decode_value<R: Reader<'a>>(reader: &mut R, _header: der::Header) -> Result<Self> {
         let oid = Oid::decode(reader)?;
         Ok(match oid {
-            ID_SIG_RSASSA_PSS => Self::RsaPss(RsaPssParameters::decode(reader)?),
             ID_SIG_ECDSA_SHA1 => {
                 Null::decode(reader)?;
                 Self::EcdsaSha1
@@ -73,6 +80,23 @@ impl<'a> DecodeValue<'a> for SignatureAlgorithmIdentifier {
             ID_SIG_ECDSA_SHA256 => Self::EcdsaSha256,
             ID_SIG_ECDSA_SHA384 => Self::EcdsaSha384,
             ID_SIG_ECDSA_SHA512 => Self::EcdsaSha512,
+            ID_SIG_RSASSA_PSS => Self::RsaPss(RsaPssParameters::decode(reader)?),
+            ID_SIG_RSASSA_PKCS1_SHA1 => {
+                Null::decode(reader)?;
+                Self::RsaPkcsSha1
+            }
+            ID_SIG_RSASSA_PKCS1_SHA256 => {
+                Null::decode(reader)?;
+                Self::RsaPkcsSha256
+            }
+            ID_SIG_RSASSA_PKCS1_SHA384 => {
+                Null::decode(reader)?;
+                Self::RsaPkcsSha384
+            }
+            ID_SIG_RSASSA_PKCS1_SHA512 => {
+                Null::decode(reader)?;
+                Self::RsaPkcsSha512
+            }
             _ => Self::Unknown(AnyAlgorithmIdentifier {
                 algorithm:  oid,
                 parameters: Option::<Any>::decode(reader)?,
@@ -186,6 +210,13 @@ mod tests {
         SignatureAlgorithmIdentifier::from_der(&der_params_w_mgf_sha256).unwrap();
         SignatureAlgorithmIdentifier::from_der(&der_params_w_mgf_sha384).unwrap();
         SignatureAlgorithmIdentifier::from_der(&der_params_w_mgf_sha512).unwrap();
+    }
+
+    #[test]
+    fn test_decode_signature_algorithm_rsa_ssa_pkc1_with_sha256() {
+        let hex = hex!("300d06092a864886f70d01010b0500");
+        let algo = SignatureAlgorithmIdentifier::from_der(&hex).unwrap();
+        assert_eq!(algo, SignatureAlgorithmIdentifier::RsaPkcsSha256);
     }
 
     #[test]
