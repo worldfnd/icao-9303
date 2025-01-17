@@ -10,10 +10,9 @@ pub mod mod_ring;
 mod pki;
 pub mod public_key;
 mod rsa;
-mod signature;
-pub mod trust;
+pub mod signature;
+mod trust;
 
-pub use codec::Codec;
 use {
     crate::asn1::public_key_info::SubjectPublicKeyInfo,
     anyhow::{ensure, Result},
@@ -25,6 +24,7 @@ use {
         fmt::{Debug, Display},
     },
 };
+pub use {codec::Codec, trust::TrustStore};
 
 pub trait CryptoCoreRng: CryptoRng + RngCore {}
 

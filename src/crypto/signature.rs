@@ -6,15 +6,31 @@ use {
             emrtd::EfSod, public_key_info::SubjectPublicKeyInfo, DigestAlgorithmIdentifier,
             SignatureAlgorithmIdentifier,
         },
-        crypto::public_key::PublicKey,
+        crypto::{public_key::PublicKey, trust::TrustStore},
         emrtd::{FileId, HasFileId},
     },
     anyhow::{anyhow, ensure, Result},
     cms::{cert::CertificateChoices, content_info::CmsVersion},
     der::{asn1::ObjectIdentifier as Oid, Decode, Encode},
+    thiserror::Error,
 };
 
 const ID_MESSAGEDIGEST: Oid = Oid::new_unwrap("1.2.840.113549.1.9.4");
+
+#[derive(Debug, Error)]
+pub enum SODValidationError {
+    #[error("Invalid signature: {0}")]
+    InvalidSignature(anyhow::Error),
+
+    #[error("Chain validation failed: {0}")]
+    TrustFailure(anyhow::Error),
+
+    #[error("Parsing error: {0}")]
+    DeserializationError(#[from] der::Error),
+
+    #[error("{0}")]
+    Other(#[from] anyhow::Error),
+}
 
 impl EfSod {
     /// Check if the provided file is included in the SOD (and is therefore
@@ -45,15 +61,16 @@ impl EfSod {
         Ok(())
     }
     /// Verify the signature of the SOD
-    pub fn verify_signature(&self) -> Result<()> {
+    pub fn verify_signature(&self, store: &TrustStore) -> Result<(), SODValidationError> {
         let signer = self.signer_info();
         let signature_algo = SignatureAlgorithmIdentifier::try_from(&signer.signature_algorithm)?;
 
         // ICAO 9303-10 4.6.2.2: SignedData must be version 3
-        ensure!(
-            self.signed_data().version == CmsVersion::V3,
-            "SignedData must be version 3"
-        );
+        if self.signed_data().version != CmsVersion::V3 {
+            return Err(SODValidationError::Other(anyhow!(
+                "SignedData must be version 3"
+            )));
+        }
 
         // ICAO 9303-10 4.6.2.2: Certificates field is mandatory
         let certificates = &self
@@ -64,10 +81,11 @@ impl EfSod {
             .0;
 
         // ICAO 9303-10 4.6.2.2: Crls field must be absent
-        ensure!(
-            self.signed_data().crls.is_none(),
-            "SignedData must not contain the Crls field"
-        );
+        if self.signed_data().crls.is_some() {
+            return Err(SODValidationError::Other(anyhow!(
+                "SignedData must not contain the Crls field"
+            )));
+        }
 
         // Lets just use the first certificate for now, grab the signer public key
         let cert = certificates
@@ -115,11 +133,20 @@ impl EfSod {
             .ok_or_else(|| anyhow!("SignedAttrs message digest values are empty"))?
             .value();
 
-        ensure!(signed_digest == lds_hash, "Signed hash not of LDS");
+        if signed_digest != lds_hash {
+            return Err(SODValidationError::Other(anyhow!("Signed hash not of LDS")));
+        }
 
         // Signature
         let signature = signer.signature.as_bytes();
 
-        pubkey.verify(&attrs_der, signature, &signature_algo)
+        pubkey.verify(&attrs_der, signature, &signature_algo)?;
+
+        // CDS trust check
+        store
+            .verify_certificate(&cert)
+            .map_err(|e| SODValidationError::TrustFailure(e))?;
+
+        Ok(())
     }
 }

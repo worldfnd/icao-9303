@@ -1,7 +1,7 @@
 mod dataset;
 
 use {
-    anyhow::Result,
+    anyhow::{bail, Result},
     dataset::{BSIDataset, DEPKI},
     der::Decode,
     icao_9303::{
@@ -9,7 +9,11 @@ use {
             pki::{DeviationList, MasterList, CRL},
             EfDg14, EfSod,
         },
-        crypto::certificate::{Certificate, X509Certificate},
+        crypto::{
+            certificate::{Certificate, X509Certificate},
+            signature::SODValidationError,
+            TrustStore,
+        },
     },
 };
 
@@ -17,8 +21,14 @@ use {
 fn test_verify_sod() -> Result<()> {
     let dataset = BSIDataset::load()?;
     let sod = EfSod::from_der(&dataset.sod)?;
+    // We don't have the CSCA certificate for the BSI dataset
+    let store = TrustStore::new();
 
-    sod.verify_signature()?;
+    match sod.verify_signature(&store) {
+        // Should only fail on trust store check
+        Err(SODValidationError::TrustFailure(e)) => anyhow::Ok(()),
+        _ => bail!("SOD signature verification should fail due to empty TrustStore"),
+    }?;
 
     Ok(())
 }
@@ -29,7 +39,6 @@ fn test_verify_dg14() -> Result<()> {
     let sod = EfSod::from_der(&dataset.sod)?;
     let dg14 = EfDg14::from_der(&dataset.dg14)?;
 
-    sod.verify_signature()?;
     sod.contains_file(&dg14)?;
 
     Ok(())

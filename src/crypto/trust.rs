@@ -50,7 +50,7 @@ impl TrustStore {
         Ok(())
     }
 
-    pub fn verify_certificate<C: X509>(&mut self, cert: &C) -> Result<()> {
+    pub fn verify_certificate<C: X509>(&self, cert: &C) -> Result<()> {
         let issuer_id = CanonicalId::of_issuer(cert)?;
         let issuer = self
             .certs
