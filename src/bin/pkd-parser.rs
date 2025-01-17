@@ -1,7 +1,12 @@
+//! Fill a [`TrustStore`] with PKD Master Lists
+
 #![allow(dead_code)]
 
 use {
-    anyhow::Result, argh::FromArgs, icao_9303::asn1::emrtd::pki::pkd::parse_master_lists, std::fs,
+    anyhow::Result,
+    argh::FromArgs,
+    icao_9303::{asn1::emrtd::pki::pkd::parse_master_lists, crypto::TrustStore},
+    std::fs,
 };
 
 /// Test a parsing of the ICAO PKD .ldif files.
@@ -18,6 +23,9 @@ fn main() -> Result<()> {
     let mls = parse_master_lists(&ldif)?;
 
     println!("{} CSCA Master Lists in the PKD", mls.len());
+
+    let mut trust = TrustStore::new();
+    mls.iter().try_for_each(|ml| trust.add_master_list(&ml))?;
 
     Ok(())
 }
