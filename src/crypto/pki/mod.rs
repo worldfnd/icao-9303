@@ -7,7 +7,7 @@ use {
             SignatureAlgorithmIdentifier,
         },
         crypto::{
-            certificate::{Certificate, EmrtdPKIProfile, X509Certificate, X509},
+            certificate::{Certificate, CertificateRef, EmrtdPKIProfile, X509Certificate, X509},
             public_key::PublicKey,
         },
     },
@@ -56,7 +56,7 @@ impl MasterList {
         for choice in certificates.iter() {
             if let CertificateChoices::Certificate(cert) = choice {
                 if cert.tbs_certificate.subject == cert.tbs_certificate.issuer {
-                    Certificate::CSCA(cert).compliance()?;
+                    CertificateRef::CSCA(cert).compliance()?;
                     csca_cert = Some(cert);
                 } else {
                     // ICAO 9303-12 7.1.1.3
@@ -81,7 +81,7 @@ impl MasterList {
                         "extendedKeyUsage included-OID in Master List Signer certificate not of \
                          Master List signing key"
                     );
-                    Certificate::MasterListSigner(cert).compliance()?;
+                    CertificateRef::MasterListSigner(cert).compliance()?;
                     master_cert = Some(cert);
                 }
             }
@@ -135,21 +135,21 @@ impl MasterList {
         Ok(())
     }
 
-    pub fn signer_certificate(&self) -> Result<Certificate<&X509Certificate>> {
+    pub fn signer_certificate(&self) -> Result<CertificateRef> {
         let master_cert = list_signer_certificate(&self.signed_data())?;
-        Ok(Certificate::MasterListSigner(master_cert))
+        Ok(CertificateRef::MasterListSigner(master_cert))
     }
 
-    pub fn csca_certificate(&self) -> Result<Certificate<&X509Certificate>> {
+    pub fn csca_certificate(&self) -> Result<CertificateRef> {
         let csca_cert = list_csca_certificate(&self.signed_data())?;
-        Ok(Certificate::CSCA(csca_cert))
+        Ok(CertificateRef::CSCA(csca_cert))
     }
 }
 
 impl CRL {
     /// Fetches a CRL from a distribution point.
     /// The distribution point URI must be defined in the provided input `cert`.
-    pub fn from_distribution_point(cert: &Certificate) -> Result<Self> {
+    pub fn from_distribution_point<C: X509>(cert: &C) -> Result<Self> {
         let ext = &cert
             .extension(&super::certificate::ID_CE_CRLDISTRIBUTIONPOINTS)
             .ok_or_else(|| {
@@ -221,7 +221,7 @@ impl CRL {
         Ok(())
     }
 
-    pub fn verify<C: X509>(&self, issuer: &Certificate<C>) -> Result<()> {
+    pub fn verify<C: X509>(&self, issuer: &C) -> Result<()> {
         let crl = &self.0;
 
         let message = crl.tbs_cert_list.to_der()?;
@@ -265,7 +265,7 @@ impl DeviationList {
         for choice in certificates.iter() {
             if let CertificateChoices::Certificate(cert) = choice {
                 if cert.tbs_certificate.subject == cert.tbs_certificate.issuer {
-                    Certificate::CSCA(cert).compliance()?;
+                    CertificateRef::CSCA(cert).compliance()?;
                     csca_cert = Some(cert);
                 } else {
                     // ICAO 9303-12 7.1.1.3
@@ -290,7 +290,7 @@ impl DeviationList {
                         "extendedKeyUsage included-OID in Deviation List Signer certificate not \
                          of Deviation List signing key"
                     );
-                    Certificate::DeviationListSigner(cert).compliance()?;
+                    CertificateRef::DeviationListSigner(cert).compliance()?;
                     master_cert = Some(cert);
                 }
             }
@@ -338,14 +338,14 @@ impl DeviationList {
         Ok(())
     }
 
-    pub fn signer_certificate(&self) -> Result<Certificate<&X509Certificate>> {
+    pub fn signer_certificate(&self) -> Result<CertificateRef> {
         let dev_cert = list_signer_certificate(&self.signed_data())?;
-        Ok(Certificate::DeviationListSigner(dev_cert))
+        Ok(CertificateRef::DeviationListSigner(dev_cert))
     }
 
-    pub fn csca_certificate(&self) -> Result<Certificate<&X509Certificate>> {
+    pub fn csca_certificate(&self) -> Result<CertificateRef> {
         let csca_cert = list_csca_certificate(&self.signed_data())?;
-        Ok(Certificate::CSCA(csca_cert))
+        Ok(CertificateRef::CSCA(csca_cert))
     }
 }
 

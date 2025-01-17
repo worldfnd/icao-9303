@@ -34,7 +34,7 @@ pub const ID_ICAO_EXT_NAMECHANGE: Oid = Oid::new_unwrap("2.23.136.1.1.6.1");
 pub const ID_ICAO_EXT_DOCUMENTTYPELIST: Oid = Oid::new_unwrap("2.23.136.1.1.6.2");
 
 #[derive(Clone, Debug)]
-pub enum Certificate<C: X509 = X509Certificate> {
+pub enum CertificateProfile<C: X509 = X509Certificate> {
     CSCA(C),
     CSCALink(C),
     DocumentSigner(C),
@@ -44,6 +44,9 @@ pub enum Certificate<C: X509 = X509Certificate> {
 }
 
 pub type X509Certificate = CertificateInner;
+
+pub type Certificate = CertificateProfile<X509Certificate>;
+pub type CertificateRef<'a> = CertificateProfile<&'a X509Certificate>;
 
 /// Helper trait to handle X509 certificates
 pub trait X509 {
@@ -70,13 +73,13 @@ macro_rules! impl_cert_delegate {
     };
 }
 
-impl<C: X509> X509 for Certificate<C> {
+impl<C: X509> X509 for CertificateProfile<C> {
     impl_cert_delegate!(x509 -> &X509Certificate);
     impl_cert_delegate!(public_key -> Result<PublicKey>);
     impl_cert_delegate!(extension(oid: &Oid) -> Option<&Extension>);
 }
 
-impl<C: X509> fmt::Display for Certificate<C> {
+impl<C: X509> fmt::Display for CertificateProfile<C> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let name = match self {
             Self::CSCA(_) => "CSCA",
@@ -121,11 +124,8 @@ impl X509 for &X509Certificate {
     }
 }
 
-impl<C: X509 + Clone> Certificate<&C>
-where
-    for<'a> &'a C: X509,
-{
-    pub fn into_owned(&self) -> Certificate<C> {
+impl<'a> CertificateRef<'a> {
+    pub fn into_owned(&self) -> Certificate {
         match self {
             Self::CSCA(cert) => Certificate::CSCA((*cert).clone()),
             Self::CSCALink(cert) => Certificate::CSCALink((*cert).clone()),
@@ -141,7 +141,7 @@ pub trait EmrtdPKIProfile: X509 {
     fn compliance(&self) -> Result<()>;
 }
 
-impl<C: X509> EmrtdPKIProfile for Certificate<C> {
+impl<C: X509> EmrtdPKIProfile for CertificateProfile<C> {
     fn compliance(&self) -> Result<()> {
         let cert = &self.x509().tbs_certificate;
 
@@ -286,8 +286,8 @@ impl<C: X509> EmrtdPKIProfile for Certificate<C> {
 
         // BasicConstraints
         match self {
-            Self::CSCA(cert) | Self::CSCALink(cert) => {
-                let ext = cert
+            Self::CSCA(_) | Self::CSCALink(_) => {
+                let ext = self
                     .extension(&ID_CE_BASICCONSTRAINTS)
                     .ok_or_else(|| anyhow!("{self} extensions must include BasicConstraints"))?;
                 let cts = BasicConstraints::from_der(ext.extn_value.as_bytes())?;
