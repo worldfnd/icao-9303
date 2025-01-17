@@ -57,7 +57,14 @@ impl TrustStore {
             .get(&issuer_id)
             .ok_or_else(|| anyhow!("Certificate of issuer not found"))?;
 
+        // Verify signature
         issuer.verify(cert)?;
+
+        // Verify revocation status
+        let issuer_crl = self.crls.get(&issuer_id);
+        if let Some(crl) = issuer_crl {
+            crl.certificate_status(cert)?;
+        }
 
         Ok(())
     }
