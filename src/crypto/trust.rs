@@ -16,7 +16,7 @@ pub struct TrustStore {
 
 /// Canonical RDN, Serial Number
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-struct CanonicalId(String);
+struct CanonicalId(String, u64);
 
 impl TrustStore {
     pub fn new() -> Self {
@@ -37,7 +37,7 @@ impl TrustStore {
     }
 
     pub fn add_crl(&mut self, crl: CRL) -> Result<()> {
-        let id = CanonicalId::new(&crl.0.tbs_cert_list.issuer)?;
+        let id = CanonicalId::of_crl(&crl)?;
         self.crls.insert(id, crl);
         Ok(())
     }
@@ -51,7 +51,7 @@ impl TrustStore {
     }
 
     pub fn verify_certificate<C: X509>(&self, cert: &C) -> Result<()> {
-        let issuer_id = CanonicalId::of_issuer(cert)?;
+        let issuer_id = CanonicalId::of_certificate(cert)?;
         let issuer = self
             .certs
             .get(&issuer_id)
@@ -73,17 +73,18 @@ impl TrustStore {
 impl CanonicalId {
     pub fn of_certificate<C: X509>(cert: &C) -> Result<Self> {
         let x509 = cert.x509();
-        let name = &x509.tbs_certificate.subject;
-        CanonicalId::new(name)
-    }
-
-    pub fn of_issuer<C: X509>(cert: &C) -> Result<Self> {
-        let x509 = cert.x509();
         let name = &x509.tbs_certificate.issuer;
-        CanonicalId::new(name)
+        let sn = x509.serial_number()?;
+        CanonicalId::new(name, sn)
     }
 
-    pub fn new(name: &Name) -> Result<Self> {
+    pub fn of_crl(crl: &CRL) -> Result<Self> {
+        let name = &crl.0.tbs_cert_list.issuer;
+        let at = crl.0.tbs_cert_list.this_update.to_unix_duration().as_secs();
+        CanonicalId::new(name, at)
+    }
+
+    pub fn new(name: &Name, number: u64) -> Result<Self> {
         let mut sets: Vec<&AttributeTypeAndValue> = Vec::new();
 
         for rdn in &name.0 {
@@ -119,6 +120,6 @@ impl CanonicalId {
             })
             .collect();
 
-        Ok(Self(result.join(",")))
+        Ok(Self(result.join(","), number))
     }
 }
