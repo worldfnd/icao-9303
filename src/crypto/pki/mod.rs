@@ -11,12 +11,15 @@ use {
             public_key::PublicKey,
         },
     },
-    anyhow::{anyhow, bail, ensure, Result},
+    anyhow::{anyhow, bail, ensure, Error, Result},
     cms::{
         cert::{
-            x509::ext::pkix::{
-                name::{DistributionPointName, GeneralName},
-                CrlDistributionPoints,
+            x509::{
+                ext::pkix::{
+                    name::{DistributionPointName, GeneralName},
+                    CrlDistributionPoints,
+                },
+                time::Time,
             },
             CertificateChoices,
         },
@@ -146,6 +149,15 @@ impl MasterList {
     }
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum RevocationStatus {
+    #[error("{0}")]
+    Undetermined(#[from] Error),
+
+    #[error("Certificate revoked on {0}")]
+    Unspecified(Time),
+}
+
 impl CRL {
     /// Fetches a CRL from a distribution point.
     /// The distribution point URI must be defined in the provided input `cert`.
@@ -200,14 +212,16 @@ impl CRL {
     }
 
     /// Check if provided certificate is revoked.
-    /// Ref RFC 5280 6.3
-    pub fn certificate_status<C: X509>(&self, cert: &C) -> Result<()> {
+    /// Ref RFC 5280 6.3, ICAO 9303-12 D.1.2
+    pub fn certificate_status<C: X509>(&self, cert: &C) -> Result<(), RevocationStatus> {
         let cert = cert.x509();
 
-        ensure!(
-            self.0.tbs_cert_list.issuer.to_der()? == cert.tbs_certificate.issuer.to_der()?,
-            "Certificate issuer is different from the CRL issuer"
-        );
+        let cert_der = cert.tbs_certificate.issuer.to_der().map_err(Error::from)?;
+        let crl_der = self.0.tbs_cert_list.issuer.to_der().map_err(Error::from)?;
+        // Issuer encodings must be the same
+        if cert_der != crl_der {
+            return Err(anyhow!("Certificate issuer is different from the CRL issuer").into());
+        }
         let revoked_certs = self.0.tbs_cert_list.revoked_certificates.as_ref();
         let revoked = revoked_certs.and_then(|rcs| {
             // Find if any revoked certificate's Serial Number match that of input cert
@@ -215,7 +229,7 @@ impl CRL {
                 .find(|rc| rc.serial_number == cert.tbs_certificate.serial_number)
         });
         if let Some(rc) = revoked {
-            bail!("Certificate was revoked on {}", rc.revocation_date);
+            return Err(RevocationStatus::Unspecified(rc.revocation_date));
         }
 
         Ok(())

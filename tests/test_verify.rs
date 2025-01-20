@@ -22,11 +22,11 @@ fn test_verify_sod() -> Result<()> {
     let dataset = BSIDataset::load()?;
     let sod = EfSod::from_der(&dataset.sod)?;
     // We don't have the CSCA certificate for the BSI dataset
-    let store = TrustStore::new(TrustPolicy::Strict);
+    let mut store = TrustStore::new(TrustPolicy::Strict);
 
-    match sod.verify_signature(&store) {
+    match sod.verify_signature(&mut store) {
         // Should only fail on trust store check
-        Err(SODValidationError::TrustFailure(e)) => anyhow::Ok(()),
+        Err(SODValidationError::TrustFailure(_)) => anyhow::Ok(()),
         _ => bail!("SOD signature verification should fail due to empty TrustStore"),
     }?;
 

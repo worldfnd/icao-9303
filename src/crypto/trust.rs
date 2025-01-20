@@ -1,7 +1,10 @@
 use {
-    super::certificate::{Certificate, ComplianceFailure, EmrtdPKIProfile, X509},
+    super::{
+        certificate::{Certificate, ComplianceFailure, EmrtdPKIProfile, X509},
+        pki::RevocationStatus,
+    },
     crate::asn1::emrtd::pki::{MasterList, CRL},
-    anyhow::{anyhow, Result},
+    anyhow::{anyhow, bail, Result},
     cms::cert::x509::{attr::AttributeTypeAndValue, name::Name},
     ruint::aliases::U160,
     std::collections::HashMap,
@@ -72,6 +75,13 @@ impl TrustStore {
         Ok(())
     }
 
+    pub fn add_crl_from_distribution_point<C: X509>(&mut self, cert: &C) -> Result<()> {
+        let crl = CRL::from_distribution_point(cert)?;
+        let id = CanonicalId::of_crl(&crl)?;
+        self.crls.insert(id, crl);
+        Ok(())
+    }
+
     pub fn add_master_list(&mut self, ml: &MasterList) -> Result<()> {
         for cert in ml.list()?.cert_list.into_vec() {
             self.add_certificate(Certificate::CSCA(cert))?;
@@ -79,7 +89,7 @@ impl TrustStore {
         Ok(())
     }
 
-    pub fn verify_certificate<C: X509>(&self, cert: &C) -> Result<()> {
+    pub fn verify_certificate<C: X509>(&mut self, cert: &C) -> Result<()> {
         let issuer_id = CanonicalId::of_certificate(cert)?;
         let issuer = self
             .certs
@@ -90,10 +100,39 @@ impl TrustStore {
         issuer.verify(cert)?;
 
         // Verify revocation status
-        let issuer_crl = self.crls.get(&issuer_id);
-        if let Some(crl) = issuer_crl {
-            crl.certificate_status(cert)?;
+        // Use CRL from local store, else try to fetch it
+        if !self.crls.contains_key(&issuer_id) {
+            if let Ok(crl) = CRL::from_distribution_point(issuer) {
+                self.add_crl(crl)?;
+            }
         }
+
+        // Get CRL, return if not found
+        let Some(crl) = self.crls.get(&issuer_id) else {
+            return match self.policy {
+                TrustPolicy::Strict | TrustPolicy::Relaxed => bail!("CRL not found"),
+                _ => Ok(()),
+            };
+        };
+
+        // Check status
+        match (crl.certificate_status(cert), &self.policy) {
+            (Ok(()), _) => Ok(()),
+            // Lower criticality status
+            (
+                Err(RevocationStatus::Undetermined(r)),
+                TrustPolicy::Strict | TrustPolicy::Relaxed,
+            ) => Err(anyhow!(
+                "Certificate revocation status is UNDETERMINED: {r}"
+            )),
+            // Revoked
+            (
+                Err(RevocationStatus::Unspecified(r)),
+                TrustPolicy::Strict | TrustPolicy::Relaxed | TrustPolicy::Permissive,
+            ) => Err(anyhow!("Certificate revocation status is UNSPECIFIED: {r}")),
+            // Ignore status for other policies
+            (Err(_), _) => Ok(()),
+        }?;
 
         Ok(())
     }

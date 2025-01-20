@@ -61,7 +61,7 @@ impl EfSod {
         Ok(())
     }
     /// Verify the signature of the SOD
-    pub fn verify_signature(&self, store: &TrustStore) -> Result<(), SODValidationError> {
+    pub fn verify_signature(&self, store: &mut TrustStore) -> Result<(), SODValidationError> {
         let signer = self.signer_info();
         let signature_algo = SignatureAlgorithmIdentifier::try_from(&signer.signature_algorithm)?;
 
