@@ -3,6 +3,7 @@ use {
     crate::asn1::emrtd::pki::{MasterList, CRL},
     anyhow::{anyhow, ensure, Result},
     cms::cert::x509::{attr::AttributeTypeAndValue, name::Name},
+    ruint::aliases::U160,
     std::collections::HashMap,
 };
 
@@ -16,7 +17,7 @@ pub struct TrustStore {
 
 /// Canonical RDN, Serial Number
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-struct CanonicalId(String, u64);
+struct CanonicalId(String, U160);
 
 impl TrustStore {
     pub fn new() -> Self {
@@ -81,10 +82,10 @@ impl CanonicalId {
     pub fn of_crl(crl: &CRL) -> Result<Self> {
         let name = &crl.0.tbs_cert_list.issuer;
         let at = crl.0.tbs_cert_list.this_update.to_unix_duration().as_secs();
-        CanonicalId::new(name, at)
+        CanonicalId::new(name, U160::from(at))
     }
 
-    pub fn new(name: &Name, number: u64) -> Result<Self> {
+    pub fn new(name: &Name, number: U160) -> Result<Self> {
         let mut sets: Vec<&AttributeTypeAndValue> = Vec::new();
 
         for rdn in &name.0 {

@@ -7,6 +7,7 @@ use {
         ext::{pkix::BasicConstraints, Extension},
     },
     der::{asn1::ObjectIdentifier as Oid, DateTime, Decode, Encode},
+    ruint::aliases::U160,
     std::{fmt, time::SystemTime},
 };
 
@@ -58,7 +59,8 @@ pub trait X509 {
     /// Get an extension, if it exists
     fn extension(&self, oid: &Oid) -> Option<&Extension>;
     /// Get the serial number as an integer
-    fn serial_number(&self) -> Result<u64>;
+    /// Must be representable using 20 bytes (RFC 5280)
+    fn serial_number(&self) -> Result<U160>;
     /// Check if `self` signed input certificate
     fn verify(&self, signed: &impl X509) -> Result<()>;
 }
@@ -82,7 +84,7 @@ impl<C: X509> X509 for CertificateProfile<C> {
     impl_cert_delegate!(x509 -> &X509Certificate);
     impl_cert_delegate!(public_key -> Result<PublicKey>);
     impl_cert_delegate!(extension(oid: &Oid) -> Option<&Extension>);
-    impl_cert_delegate!(serial_number -> Result<u64>);
+    impl_cert_delegate!(serial_number -> Result<U160>);
     impl_cert_delegate!(verify(signed: &impl X509) -> Result<()>);
 }
 
@@ -116,15 +118,13 @@ impl X509 for X509Certificate {
             .and_then(|exts| exts.iter().find(|ext| ext.extn_id == *oid))
     }
 
-    fn serial_number(&self) -> Result<u64> {
+    fn serial_number(&self) -> Result<U160> {
         let slice = &self.tbs_certificate.serial_number.as_bytes();
-        let mut padded = [0u8; 8];
         ensure!(
-            slice.len() <= 8,
-            "Serial Number not representable in 64 bits"
+            slice.len() <= 20,
+            "Serial Number not representable in 20 octets"
         );
-        padded[8 - slice.len()..].copy_from_slice(&slice);
-        Ok(u64::from_be_bytes(padded))
+        Ok(U160::from_be_slice(slice))
     }
 
     fn verify(&self, signed: &impl X509) -> Result<()> {
@@ -154,7 +154,7 @@ impl X509 for &X509Certificate {
         (*self).extension(oid)
     }
 
-    fn serial_number(&self) -> Result<u64> {
+    fn serial_number(&self) -> Result<U160> {
         (*self).serial_number()
     }
 
