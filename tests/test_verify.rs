@@ -12,7 +12,7 @@ use {
         crypto::{
             certificate::{Certificate, X509Certificate},
             signature::SODValidationError,
-            TrustStore,
+            TrustPolicy, TrustStore,
         },
     },
 };
@@ -22,7 +22,7 @@ fn test_verify_sod() -> Result<()> {
     let dataset = BSIDataset::load()?;
     let sod = EfSod::from_der(&dataset.sod)?;
     // We don't have the CSCA certificate for the BSI dataset
-    let store = TrustStore::new();
+    let store = TrustStore::new(TrustPolicy::Strict);
 
     match sod.verify_signature(&store) {
         // Should only fail on trust store check

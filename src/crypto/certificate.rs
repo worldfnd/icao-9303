@@ -9,6 +9,7 @@ use {
     der::{asn1::ObjectIdentifier as Oid, DateTime, Decode, Encode},
     ruint::aliases::U160,
     std::{fmt, time::SystemTime},
+    thiserror::Error,
 };
 
 pub const ID_CE_SUBJECTDIRECTORYATTRIBUTES: Oid = Oid::new_unwrap("2.5.29.9");
@@ -177,41 +178,62 @@ impl<'a> CertificateRef<'a> {
 }
 
 pub trait EmrtdPKIProfile: X509 {
-    fn compliance(&self) -> Result<()>;
+    fn compliance(&self) -> Result<(), ComplianceFailure>;
+}
+
+#[derive(Debug, Error)]
+pub enum ComplianceFailure {
+    #[error("Certificate valid from {0} to {1}")]
+    InvalidPeriod(DateTime, DateTime),
+
+    #[error("Extensions are absent")]
+    ExtensionsAbsent,
+
+    #[error("Certificate extension {0} not found")]
+    ExtensionMissing(Oid),
+
+    #[error("Certificate extension {0} found")]
+    ExtensionPresent(Oid),
+
+    #[error("Certificate extension {0} has incorrect attribute: {1}")]
+    ExtensionAttributeIncorrect(Oid, &'static str),
+
+    #[error("{0}")]
+    Other(#[from] anyhow::Error),
 }
 
 impl<C: X509> EmrtdPKIProfile for CertificateProfile<C> {
-    fn compliance(&self) -> Result<()> {
+    fn compliance(&self) -> Result<(), ComplianceFailure> {
         let cert = &self.x509().tbs_certificate;
 
-        ensure!(cert.version == Version::V3);
-        ensure!(cert.serial_number.as_bytes().len() <= 20);
-
-        let now = DateTime::from_system_time(SystemTime::now())?;
+        let now = DateTime::from_system_time(SystemTime::now()).map_err(|e| anyhow!("{e}"))?;
         let start = cert.validity.not_before.to_date_time();
         let end = cert.validity.not_after.to_date_time();
 
-        ensure!(
-            now >= start,
-            "Certificate only valid from {}",
-            start.to_string()
-        );
-        ensure!(now <= end, "Certificate expired on {}", end.to_string());
+        if now < start || now > end {
+            return Err(ComplianceFailure::InvalidPeriod(start, end));
+        }
 
-        ensure!(
-            cert.issuer_unique_id.is_none(),
-            "Certificate issuerUniqueId must be absent"
-        );
-        ensure!(
-            cert.subject_unique_id.is_none(),
-            "Certificate subjectUniqueId must be absent"
-        );
+        if cert.issuer_unique_id.is_some() {
+            return Err(anyhow!("Certificate issuerUniqueId must be absent").into());
+        }
 
-        let extensions = if let Some(extensions) = &cert.extensions {
-            extensions
-        } else {
-            bail!("Certificate extensions must be present")
-        };
+        if cert.subject_unique_id.is_some() {
+            return Err(anyhow!("Certificate subjectUniqueId must be absent").into());
+        }
+
+        let extensions = cert
+            .extensions
+            .as_ref()
+            .ok_or_else(|| ComplianceFailure::ExtensionsAbsent)?;
+
+        if cert.version != Version::V3 {
+            return Err(anyhow!("Version is {:?} (!= 3)", cert.version).into());
+        }
+
+        if cert.serial_number.as_bytes().len() > 20 {
+            return Err(anyhow!("Serial number larger than 20 bytes").into());
+        }
 
         // Extensions
         enum Requirement {
@@ -219,12 +241,14 @@ impl<C: X509> EmrtdPKIProfile for CertificateProfile<C> {
             Absent,
             Optional,
         }
-        let check_ext = |oid: &Oid, req: Requirement| -> Result<()> {
+        let check_ext = |oid: &Oid, req: Requirement| -> Result<(), ComplianceFailure> {
             let present = extensions.iter().any(|ext| ext.extn_id == *oid);
             match (req, present) {
-                (Requirement::Present, false) => bail!("Certificate extensions must include {oid}"),
+                (Requirement::Present, false) => {
+                    Err(ComplianceFailure::ExtensionMissing(oid.clone()))
+                }
                 (Requirement::Absent, true) => {
-                    bail!("Certificate extensions must not include {oid}")
+                    Err(ComplianceFailure::ExtensionPresent(oid.clone()))
                 }
                 _ => Ok(()),
             }
@@ -329,15 +353,24 @@ impl<C: X509> EmrtdPKIProfile for CertificateProfile<C> {
                 let ext = self
                     .extension(&ID_CE_BASICCONSTRAINTS)
                     .ok_or_else(|| anyhow!("{self} extensions must include BasicConstraints"))?;
-                let cts = BasicConstraints::from_der(ext.extn_value.as_bytes())?;
-                ensure!(
-                    cts.ca,
-                    "{self} extension BasicConstraints must be labelled as CA"
-                );
-                ensure!(
-                    cts.path_len_constraint.unwrap_or(0) == 0,
-                    "{self} extension BasicConstraints path length must be 0"
-                );
+                let cts = BasicConstraints::from_der(ext.extn_value.as_bytes()).map_err(|_| {
+                    ComplianceFailure::ExtensionAttributeIncorrect(
+                        ID_CE_BASICCONSTRAINTS,
+                        "Failed decoding attributes",
+                    )
+                })?;
+                if !cts.ca {
+                    return Err(ComplianceFailure::ExtensionAttributeIncorrect(
+                        ID_CE_BASICCONSTRAINTS,
+                        "Must be labelled as CA",
+                    ));
+                }
+                if cts.path_len_constraint.unwrap_or(0) != 0 {
+                    return Err(ComplianceFailure::ExtensionAttributeIncorrect(
+                        ID_CE_BASICCONSTRAINTS,
+                        "Path length must be 0",
+                    ));
+                }
             }
             Self::DocumentSigner(_)
             | Self::MasterListSigner(_)

@@ -1,7 +1,7 @@
 use {
-    super::certificate::{Certificate, X509},
+    super::certificate::{Certificate, ComplianceFailure, EmrtdPKIProfile, X509},
     crate::asn1::emrtd::pki::{MasterList, CRL},
-    anyhow::{anyhow, ensure, Result},
+    anyhow::{anyhow, Result},
     cms::cert::x509::{attr::AttributeTypeAndValue, name::Name},
     ruint::aliases::U160,
     std::collections::HashMap,
@@ -10,9 +10,26 @@ use {
 #[derive(Debug, Clone)]
 pub struct TrustStore {
     /// Trusted CSCA certificates, mapped by Subject ID
-    certs: HashMap<CanonicalId, Certificate>,
+    certs:  HashMap<CanonicalId, Certificate>,
     /// CRLs, mapped by Issuer ID
-    crls:  HashMap<CanonicalId, CRL>,
+    crls:   HashMap<CanonicalId, CRL>,
+    /// Validation policy
+    policy: TrustPolicy,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TrustPolicy {
+    /// Strict validation, no deviations allowed
+    Strict,
+    /// Allow minor deviations that don't impact security
+    /// (e.g., missing extensions)
+    Relaxed,
+    /// Allow most deviations except critical security violations
+    /// (e.g., expired certificates, invalid signatures)
+    Permissive,
+    /// Accept everything except cryptographic failures
+    /// (Use with caution, mainly for testing/debugging)
+    Testing,
 }
 
 /// Canonical RDN, Serial Number
@@ -20,20 +37,32 @@ pub struct TrustStore {
 struct CanonicalId(String, U160);
 
 impl TrustStore {
-    pub fn new() -> Self {
+    pub fn new(policy: TrustPolicy) -> Self {
         Self {
             certs: HashMap::new(),
-            crls:  HashMap::new(),
+            crls: HashMap::new(),
+            policy,
         }
     }
 
     pub fn add_certificate(&mut self, cert: Certificate) -> Result<()> {
-        ensure!(
-            matches!(Certificate::CSCA, _cert),
-            "Only CSCA certificates supported"
-        );
         let id = CanonicalId::of_certificate(&cert)?;
-        self.certs.insert(id, cert);
+        match cert.compliance() {
+            Ok(()) => {
+                self.certs.insert(id, cert);
+            }
+            Err(e) => match self.policy {
+                TrustPolicy::Strict => (),
+                TrustPolicy::Relaxed => {
+                    if !matches!(e, ComplianceFailure::InvalidPeriod(_, _)) {
+                        self.certs.insert(id, cert);
+                    }
+                }
+                TrustPolicy::Permissive | TrustPolicy::Testing => {
+                    self.certs.insert(id, cert);
+                }
+            },
+        }
         Ok(())
     }
 
@@ -45,8 +74,7 @@ impl TrustStore {
 
     pub fn add_master_list(&mut self, ml: &MasterList) -> Result<()> {
         for cert in ml.list()?.cert_list.into_vec() {
-            let id = CanonicalId::of_certificate(&cert)?;
-            self.certs.insert(id, Certificate::CSCA(cert));
+            self.add_certificate(Certificate::CSCA(cert))?;
         }
         Ok(())
     }

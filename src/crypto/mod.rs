@@ -24,7 +24,10 @@ use {
         fmt::{Debug, Display},
     },
 };
-pub use {codec::Codec, trust::TrustStore};
+pub use {
+    codec::Codec,
+    trust::{TrustPolicy, TrustStore},
+};
 
 pub trait CryptoCoreRng: CryptoRng + RngCore {}
 
