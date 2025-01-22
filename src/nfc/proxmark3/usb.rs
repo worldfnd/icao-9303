@@ -28,7 +28,7 @@ impl UsbConnection {
                 return Self::from_device(device);
             }
         }
-        panic!("Proxmark3 device not found");
+        Err(anyhow!("Proxmark3 device not found"))
     }
 
     pub fn from_device(device: rusb::Device<GlobalContext>) -> Result<Self> {
