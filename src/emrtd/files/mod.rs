@@ -49,14 +49,15 @@ impl Emrtd {
             return Ok(entry.clone());
         }
 
-        // Select parent file if necessary.
-        if self.parent != file.parent() {
-            if let Some(application_id) = file.parent().aid() {
-                self.select_dedicated_file(application_id)?;
-            } else {
-                self.select_master_file()?;
-            }
-        }
+        // TODO: PACE support required for MF
+        //// Select parent file if necessary.
+        // if self.parent != file.parent() {
+        //    if let Some(application_id) = file.parent().aid() {
+        //        self.select_dedicated_file(application_id)?;
+        //    } else {
+        //        self.select_master_file()?;
+        //    }
+        //}
 
         // Read file by short EF.
         let mut result: Option<Vec<u8>> = match self.read_binary_short_ef(file.short_id()) {
@@ -123,6 +124,11 @@ impl Emrtd {
         ensure_err!(status.is_success(), status.into());
         ensure_err!(data.is_empty(), Error::ResponseDataUnexpected);
         Ok(())
+    }
+
+    pub fn select_emrtd_application(&mut self) -> Result<()> {
+        let id = file_id::EMRTD_LDS1_AID;
+        self.select_dedicated_file(id)
     }
 
     /// Read binary data from an elementary file using a Short EF identifier.
