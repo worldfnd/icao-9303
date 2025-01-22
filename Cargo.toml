@@ -36,7 +36,7 @@ opt-level = 2
 opt-level = 3
 
 [features]
-default = ["proxmark3"]
+default = ["proxmark3", "pcsc"]
 proxmark3 = ["rusb"]
 
 [dependencies]
@@ -57,7 +57,7 @@ hex = "0.4.3"
 hex-literal = "0.4.1"
 num-traits = "0.2.19"
 num_enum = "0.7.3"
-pcsc = "2.9"
+pcsc = { version = "2.9", optional = true }
 rand = "0.8.5"
 ruint = { version = "1.12.4", features = [
     "rand",
