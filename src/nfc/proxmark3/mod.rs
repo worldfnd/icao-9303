@@ -355,7 +355,7 @@ impl NfcReader for Proxmark3 {
         let data = match self.current_card {
             Some(CardType::A(_)) => self.hf14a_send(apdu)?,
             Some(CardType::B(_)) => self.hf14b_send(apdu)?,
-            None => bail!("No card connected"),
+            _ => bail!("No card connected"),
         };
         ensure!(data.len() >= 2);
         let (data, status) = data.split_at(data.len() - 2);
