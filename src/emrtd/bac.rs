@@ -36,6 +36,9 @@ impl Emrtd {
     }
 
     pub fn basic_access_control(&mut self, rng: &mut impl Rng, mrz: &str) -> Result<()> {
+        // eMRTD application must be selected
+        self.select_emrtd_application()?;
+
         // Compute local randomness
         let rnd_ifd: [u8; 8] = rng.gen();
         let k_ifd: [u8; 16] = rng.gen();
