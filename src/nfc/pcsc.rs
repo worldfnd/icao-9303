@@ -1,3 +1,5 @@
+#![cfg(feature = "pcsc")]
+
 use {
     super::{CardType, NfcReader},
     crate::iso7816::StatusWord,
@@ -15,19 +17,24 @@ impl PCSC {
         // Establish a PC/SC context
         let ctx = Context::establish(Scope::User)
             .map_err(|e| anyhow!("Failed to establish context: {e}"))?;
-        Ok(PCSC {ctx, card: None})
+        Ok(PCSC { ctx, card: None })
     }
 
     pub fn connect(&mut self) -> Result<()> {
         // List available readers
         let mut readers_buf = [0; 2048];
-        let mut readers = self.ctx
+        let mut readers = self
+            .ctx
             .list_readers(&mut readers_buf)
             .map_err(|e| anyhow!("Failed to list readers: {e}"))?;
 
         // Find first reader with card
         let card = readers
-            .find_map(|reader| self.ctx.connect(reader, ShareMode::Shared, Protocols::ANY).ok())
+            .find_map(|reader| {
+                self.ctx
+                    .connect(reader, ShareMode::Shared, Protocols::ANY)
+                    .ok()
+            })
             .ok_or_else(|| anyhow!("No card found"))?;
 
         self.card = Some(card);
@@ -36,7 +43,9 @@ impl PCSC {
     }
 
     pub fn send(&mut self, apdu: &[u8]) -> Result<(StatusWord, Vec<u8>)> {
-        let Some(card) = &self.card else { bail!("Not connected to a card") };
+        let Some(card) = &self.card else {
+            bail!("Not connected to a card")
+        };
         let mut rapdu_buf = [0; MAX_BUFFER_SIZE];
         let rapdu = card
             .transmit(apdu, &mut rapdu_buf)
@@ -53,8 +62,12 @@ impl PCSC {
         Ok(())
     }
 
-    pub fn ctx(&self) -> &Context { &self.ctx }
-    pub fn ctx_mut(&mut self) -> &mut Context { &mut self.ctx }
+    pub fn ctx(&self) -> &Context {
+        &self.ctx
+    }
+    pub fn ctx_mut(&mut self) -> &mut Context {
+        &mut self.ctx
+    }
 }
 
 impl NfcReader for PCSC {

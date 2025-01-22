@@ -49,13 +49,34 @@ pub trait NfcReader {
 
 /// Tries to connect to either the PCSC daemon or a Proxmark3 device
 pub fn connect_reader() -> Result<Box<dyn NfcReader>> {
+    let mut errors = Vec::new();
+
+    #[cfg(feature = "pcsc")]
+    // Connect to the daemon
     match pcsc::PCSC::init() {
-        Ok(reader) => Ok(Box::new(reader) as Box<dyn NfcReader>),
-        Err(pcsc_err) => match proxmark3::Proxmark3::new() {
-            Ok(reader) => Ok(Box::new(reader) as Box<dyn NfcReader>),
-            Err(pm3_err) => Err(anyhow::anyhow!(
-                "Failed to connect to any reader:\n  PCSC: {pcsc_err}\n  Proxmark3: {pm3_err}"
-            ))
+        Ok(mut reader) => {
+            // Connect to the card
+            match reader.connect() {
+                Ok(()) => return Ok(Box::new(reader) as Box<dyn NfcReader>),
+                Err(e) => errors.push(("PCSC", e)),
+            }
         }
+        Err(e) => errors.push(("PCSC", e)),
     }
+
+    #[cfg(feature = "proxmark3")]
+    match proxmark3::Proxmark3::new() {
+        Ok(reader) => return Ok(Box::new(reader) as Box<dyn NfcReader>),
+        Err(e) => errors.push(("Proxmark3", e)),
+    }
+
+    let error_msg = errors
+        .iter()
+        .map(|(name, err)| format!("  {name}: {err}"))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    Err(anyhow::anyhow!(
+        "Failed connecting to card using any reader:\n{error_msg}"
+    ))
 }
