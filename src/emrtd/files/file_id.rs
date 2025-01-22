@@ -131,7 +131,7 @@ impl FileId {
     }
 
     pub fn file_id(&self) -> u16 {
-        // CardAccess and Sod are the same, but live in different applications.
+        // CardSecurity and Sod are the same, but live in different applications.
         match self {
             Self::AttrInfo => 0x2f01,
             Self::Dir => 0x2f00,
