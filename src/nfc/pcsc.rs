@@ -43,7 +43,9 @@ impl PCSC {
     }
 
     pub fn send(&mut self, apdu: &[u8]) -> Result<(StatusWord, Vec<u8>)> {
-        let Some(card) = &self.card else { bail!("Not connected to a card") };
+        let Some(card) = &self.card else {
+            bail!("Not connected to a card")
+        };
         let mut rapdu_buf = [0; MAX_BUFFER_SIZE];
         let rapdu = card
             .transmit(apdu, &mut rapdu_buf)
