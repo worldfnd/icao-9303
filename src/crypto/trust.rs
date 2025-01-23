@@ -6,8 +6,7 @@ use {
     crate::asn1::emrtd::pki::{MasterList, CRL},
     anyhow::{anyhow, bail, Result},
     cms::cert::x509::{attr::AttributeTypeAndValue, name::Name},
-    ruint::aliases::U160,
-    std::collections::HashMap,
+    std::collections::{hash_map::Entry, HashMap},
 };
 
 #[derive(Debug, Clone)]
@@ -37,7 +36,7 @@ pub enum TrustPolicy {
 
 /// Canonical RDN, Serial Number
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-struct CanonicalId(String, U160);
+struct CanonicalId(String);
 
 impl TrustStore {
     pub fn new(policy: TrustPolicy) -> Self {
@@ -49,22 +48,59 @@ impl TrustStore {
     }
 
     pub fn add_certificate(&mut self, cert: Certificate) -> Result<()> {
-        let id = CanonicalId::of_certificate(&cert)?;
         match cert.compliance() {
             Ok(()) => {
-                self.certs.insert(id, cert);
+                self.insert_certificate(cert)?;
             }
             Err(e) => match self.policy {
                 TrustPolicy::Strict => (),
                 TrustPolicy::Relaxed => {
-                    if !matches!(e, ComplianceFailure::InvalidPeriod(_, _)) {
-                        self.certs.insert(id, cert);
+                    if !matches!(
+                        e,
+                        ComplianceFailure::InvalidPeriod(_, _)
+                            | ComplianceFailure::ExtensionsAbsent
+                    ) {
+                        self.insert_certificate(cert)?;
                     }
                 }
-                TrustPolicy::Permissive | TrustPolicy::Testing => {
-                    self.certs.insert(id, cert);
+                TrustPolicy::Permissive => {
+                    if !matches!(e, ComplianceFailure::InvalidPeriod(_, _)) {
+                        self.insert_certificate(cert)?;
+                    }
+                }
+                TrustPolicy::Testing => {
+                    self.insert_certificate(cert)?;
                 }
             },
+        }
+        Ok(())
+    }
+
+    fn insert_certificate(&mut self, cert: Certificate) -> Result<()> {
+        let id = CanonicalId::of_certificate(&cert)?;
+        match self.certs.entry(id) {
+            Entry::Vacant(entry) => {
+                entry.insert(cert);
+            }
+            // If certificate of same name exists, store the most recent one
+            Entry::Occupied(mut entry) => {
+                let cert_time = cert
+                    .x509()
+                    .tbs_certificate
+                    .validity
+                    .not_before
+                    .to_unix_duration();
+                let entry_time = entry
+                    .get()
+                    .x509()
+                    .tbs_certificate
+                    .validity
+                    .not_before
+                    .to_unix_duration();
+                if cert_time > entry_time {
+                    entry.insert(cert);
+                }
+            }
         }
         Ok(())
     }
@@ -90,7 +126,7 @@ impl TrustStore {
     }
 
     pub fn verify_certificate<C: X509>(&mut self, cert: &C) -> Result<()> {
-        let issuer_id = CanonicalId::of_certificate(cert)?;
+        let issuer_id = CanonicalId::of_issuer(cert)?;
         let issuer = self
             .certs
             .get(&issuer_id)
@@ -141,18 +177,22 @@ impl TrustStore {
 impl CanonicalId {
     pub fn of_certificate<C: X509>(cert: &C) -> Result<Self> {
         let x509 = cert.x509();
+        let name = &x509.tbs_certificate.subject;
+        CanonicalId::new(name)
+    }
+
+    pub fn of_issuer<C: X509>(cert: &C) -> Result<Self> {
+        let x509 = cert.x509();
         let name = &x509.tbs_certificate.issuer;
-        let sn = x509.serial_number()?;
-        CanonicalId::new(name, sn)
+        CanonicalId::new(name)
     }
 
     pub fn of_crl(crl: &CRL) -> Result<Self> {
         let name = &crl.0.tbs_cert_list.issuer;
-        let at = crl.0.tbs_cert_list.this_update.to_unix_duration().as_secs();
-        CanonicalId::new(name, U160::from(at))
+        CanonicalId::new(name)
     }
 
-    pub fn new(name: &Name, number: U160) -> Result<Self> {
+    pub fn new(name: &Name) -> Result<Self> {
         let mut sets: Vec<&AttributeTypeAndValue> = Vec::new();
 
         for rdn in &name.0 {
@@ -188,6 +228,6 @@ impl CanonicalId {
             })
             .collect();
 
-        Ok(Self(result.join(","), number))
+        Ok(Self(result.join(",")))
     }
 }

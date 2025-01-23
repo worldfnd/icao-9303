@@ -120,6 +120,9 @@ impl X509 for X509Certificate {
     }
 
     fn serial_number(&self) -> Result<U160> {
+        // While serial number must be positive, some certificates are issued with a
+        // negative serial number.
+        // TODO: handle negative numbers
         let slice = &self.tbs_certificate.serial_number.as_bytes();
         ensure!(
             slice.len() <= 20,
@@ -206,7 +209,7 @@ impl<C: X509> EmrtdPKIProfile for CertificateProfile<C> {
     fn compliance(&self) -> Result<(), ComplianceFailure> {
         let cert = &self.x509().tbs_certificate;
 
-        let now = DateTime::from_system_time(SystemTime::now()).map_err(|e| anyhow!("{e}"))?;
+        let now = DateTime::from_system_time(SystemTime::now()).map_err(anyhow::Error::new)?;
         let start = cert.validity.not_before.to_date_time();
         let end = cert.validity.not_after.to_date_time();
 
