@@ -42,6 +42,7 @@ proxmark3 = ["rusb"]
 [dependencies]
 aes = "0.8.4"
 anyhow = "1.0.89"
+base64 = "0.22"
 blake3 = "1.5.4"
 bytes = "1.7.1"
 cbc = { version = "0.1.2", features = ["block-padding"] }
