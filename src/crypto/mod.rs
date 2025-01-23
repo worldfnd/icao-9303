@@ -2,13 +2,17 @@
 //!
 //! Primarily based on TR-03111.
 
+pub mod certificate;
 mod codec;
+mod ecdsa;
 pub mod groups;
 pub mod mod_ring;
+mod pki;
+pub mod public_key;
 mod rsa;
-mod signature;
+pub mod signature;
+mod trust;
 
-pub use codec::Codec;
 use {
     crate::asn1::public_key_info::SubjectPublicKeyInfo,
     anyhow::{ensure, Result},
@@ -19,6 +23,10 @@ use {
         any::Any,
         fmt::{Debug, Display},
     },
+};
+pub use {
+    codec::Codec,
+    trust::{TrustPolicy, TrustStore},
 };
 
 pub trait CryptoCoreRng: CryptoRng + RngCore {}

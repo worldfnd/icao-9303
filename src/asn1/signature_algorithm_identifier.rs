@@ -1,7 +1,7 @@
 use {
     super::{AnyAlgorithmIdentifier, DigestAlgorithmIdentifier, DigestAlgorithmParameters},
     der::{
-        asn1::{Int, ObjectIdentifier as Oid},
+        asn1::{Int, Null, ObjectIdentifier as Oid},
         Any, Decode, DecodeValue, Encode, EncodeValue, Length, Reader, Result, Sequence, ValueOrd,
         Writer,
     },
@@ -10,10 +10,26 @@ use {
 
 pub const ID_SIG_RSASSA_PSS: Oid = Oid::new_unwrap("1.2.840.113549.1.1.10");
 pub const ID_MGFA_MGF1: Oid = Oid::new_unwrap("1.2.840.113549.1.1.8");
+pub const ID_SIG_ECDSA_SHA1: Oid = Oid::new_unwrap("1.2.840.10045.4.1");
+pub const ID_SIG_ECDSA_SHA224: Oid = Oid::new_unwrap("1.2.840.10045.4.3.1");
+pub const ID_SIG_ECDSA_SHA256: Oid = Oid::new_unwrap("1.2.840.10045.4.3.2");
+pub const ID_SIG_ECDSA_SHA384: Oid = Oid::new_unwrap("1.2.840.10045.4.3.3");
+pub const ID_SIG_ECDSA_SHA512: Oid = Oid::new_unwrap("1.2.840.10045.4.3.4");
+
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug, Sequence)]
+pub struct EcdsaSigValue {
+    pub r: Int,
+    pub s: Int,
+}
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub enum SignatureAlgorithmIdentifier {
     RsaPss(RsaPssParameters),
+    EcdsaSha1,
+    EcdsaSha224,
+    EcdsaSha256,
+    EcdsaSha384,
+    EcdsaSha512,
     Unknown(AnyAlgorithmIdentifier),
 }
 
@@ -31,15 +47,15 @@ impl ValueOrd for SignatureAlgorithmIdentifier {
 impl EncodeValue for SignatureAlgorithmIdentifier {
     fn value_len(&self) -> Result<Length> {
         match self {
-            Self::RsaPss(_) => todo!(),
             Self::Unknown(any) => any.value_len(),
+            _ => todo!(),
         }
     }
 
     fn encode_value(&self, writer: &mut impl Writer) -> Result<()> {
         match self {
-            Self::RsaPss(_) => todo!(),
             Self::Unknown(any) => any.encode(writer),
+            _ => todo!(),
         }
     }
 }
@@ -49,6 +65,14 @@ impl<'a> DecodeValue<'a> for SignatureAlgorithmIdentifier {
         let oid = Oid::decode(reader)?;
         Ok(match oid {
             ID_SIG_RSASSA_PSS => Self::RsaPss(RsaPssParameters::decode(reader)?),
+            ID_SIG_ECDSA_SHA1 => {
+                Null::decode(reader)?;
+                Self::EcdsaSha1
+            }
+            ID_SIG_ECDSA_SHA224 => Self::EcdsaSha224,
+            ID_SIG_ECDSA_SHA256 => Self::EcdsaSha256,
+            ID_SIG_ECDSA_SHA384 => Self::EcdsaSha384,
+            ID_SIG_ECDSA_SHA512 => Self::EcdsaSha512,
             _ => Self::Unknown(AnyAlgorithmIdentifier {
                 algorithm:  oid,
                 parameters: Option::<Any>::decode(reader)?,
@@ -141,6 +165,13 @@ impl<'a> DecodeValue<'a> for MaskGenAlgorithm {
     }
 }
 
+impl TryFrom<&spki::AlgorithmIdentifierOwned> for SignatureAlgorithmIdentifier {
+    type Error = anyhow::Error;
+    fn try_from(id: &spki::AlgorithmIdentifierOwned) -> anyhow::Result<Self, anyhow::Error> {
+        Ok(Self::from_der(&id.to_der()?)?)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use {super::*, hex_literal::hex};
@@ -155,5 +186,19 @@ mod tests {
         SignatureAlgorithmIdentifier::from_der(&der_params_w_mgf_sha256).unwrap();
         SignatureAlgorithmIdentifier::from_der(&der_params_w_mgf_sha384).unwrap();
         SignatureAlgorithmIdentifier::from_der(&der_params_w_mgf_sha512).unwrap();
+    }
+
+    #[test]
+    fn test_decode_signature_algorithm_ecdsa_with_sha1() {
+        let hex = hex!("300b06072a8648ce3d04010500");
+        let algo = SignatureAlgorithmIdentifier::from_der(&hex).unwrap();
+        assert_eq!(algo, SignatureAlgorithmIdentifier::EcdsaSha1);
+    }
+
+    #[test]
+    fn test_decode_signature_algorithm_ecdsa_with_sha256() {
+        let hex = hex!("300a06082a8648ce3d040302");
+        let algo = SignatureAlgorithmIdentifier::from_der(&hex).unwrap();
+        assert_eq!(algo, SignatureAlgorithmIdentifier::EcdsaSha256);
     }
 }

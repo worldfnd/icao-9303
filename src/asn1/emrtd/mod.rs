@@ -1,3 +1,4 @@
+pub mod pki;
 pub mod security_info;
 
 use {
