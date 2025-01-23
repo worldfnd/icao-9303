@@ -138,8 +138,9 @@ impl TrustStore {
         // Verify revocation status
         // Use CRL from local store, else try to fetch it
         if !self.crls.contains_key(&issuer_id) {
-            if let Ok(crl) = CRL::from_distribution_point(issuer) {
-                self.add_crl(crl)?;
+            match CRL::from_distribution_point(issuer) {
+                Ok(crl) => self.add_crl(crl)?,
+                Err(e) => eprintln!("Failed fetching CRL: {e}"),
             }
         }
 
