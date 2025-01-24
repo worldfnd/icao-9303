@@ -2,6 +2,7 @@ name: Cargo Build & Test
 
 on:
   push:
+    branches: ["main"]
   pull_request:
 
 env:
@@ -18,6 +19,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: rustup update ${{ matrix.toolchain }} && rustup default ${{ matrix.toolchain }}
+      - run: rustup component add clippy
       - run: cargo build --all-targets --all-features --verbose
       - run: cargo test --all-targets --all-features --verbose
       - run: cargo test --doc --all-features --verbose
