@@ -63,6 +63,10 @@ fn main() -> Result<()> {
     let sod: EfSod = card.read_cached()?;
     println!("DOCUMENT HASH = 0x{}", hex::encode(sod.document_hash()));
 
+    // Do Active Authentication
+    card.chip_authenticate(&mut rng)
+        .map_err(|e|anyhow!("Error during Active Authentication: {e:#}"))?;
+
     // Do Chip Authentication
     card.chip_authenticate(&mut rng)
         .context("Error during Chip Authentication.")?;
