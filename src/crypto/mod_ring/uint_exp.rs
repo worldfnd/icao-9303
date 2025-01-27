@@ -9,6 +9,9 @@ pub trait UintExp {
     /// Ideally this should not depend on the value.
     fn bit_len(&self) -> usize;
 
+    /// Returns the actual number of significant bits in the value
+    fn significant_bits(&self) -> usize;
+
     /// Is the `indext`th bit set in the binary expansion of `self`.
     fn bit_ct(&self, index: usize) -> Choice;
 }
@@ -19,7 +22,12 @@ where
     T: PrimInt + Unsigned + ConstantTimeEq,
 {
     fn bit_len(&self) -> usize {
-        T::zero().count_zeros() as usize
+        T::zero().count_zeros() as usize // Return full type length as upper
+                                         // bound
+    }
+
+    fn significant_bits(&self) -> usize {
+        self.bit_len() - self.leading_zeros() as usize
     }
 
     fn bit_ct(&self, index: usize) -> Choice {

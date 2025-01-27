@@ -2,11 +2,16 @@
 //!
 //! Primarily based on TR-03111.
 
+pub mod certificate;
 mod codec;
+mod ecdsa;
 pub mod groups;
 pub mod mod_ring;
+mod pki;
+pub mod public_key;
 mod rsa;
 mod signature;
+pub mod trust;
 
 pub use codec::Codec;
 use {

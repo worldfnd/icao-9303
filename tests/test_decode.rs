@@ -3,17 +3,24 @@ mod dataset;
 use {
     anyhow::{anyhow as err, bail, ensure, Result},
     cms::content_info::CmsVersion,
-    dataset::Dataset,
-    der::Decode,
-    icao_9303::asn1::{
-        emrtd::{security_info::SecurityInfo, EfDg14, EfSod},
-        DigestAlgorithmIdentifier,
+    dataset::{BSIDataset, DEPKI},
+    der::{Decode, Encode},
+    icao_9303::{
+        asn1::{
+            emrtd::{
+                pki::{DeviationList, MasterList, CRL},
+                security_info::SecurityInfo,
+                EfDg14, EfSod,
+            },
+            DigestAlgorithmIdentifier, SignatureAlgorithmIdentifier,
+        },
+        crypto::certificate::{Certificate, X509Certificate},
     },
 };
 
 #[test]
 fn test_decode_dg14() -> Result<()> {
-    let dataset = Dataset::load()?;
+    let dataset = BSIDataset::load()?;
     let dg14 = EfDg14::from_der(&dataset.dg14)?;
 
     assert_eq!(dg14.0 .0.len(), 3);
@@ -47,7 +54,7 @@ fn test_decode_dg14() -> Result<()> {
 
 #[test]
 fn test_decode_sod() -> Result<()> {
-    let dataset = Dataset::load()?;
+    let dataset = BSIDataset::load()?;
     let sod = EfSod::from_der(&dataset.sod)?;
 
     // SecurityObject
@@ -72,6 +79,58 @@ fn test_decode_sod() -> Result<()> {
 
     // Signer
     assert_eq!(sod.signer_info().version, CmsVersion::V1);
+
+    Ok(())
+}
+
+#[test]
+fn test_decode_master_list() -> Result<()> {
+    let dataset = DEPKI::load()?;
+    let ml = MasterList::from_der(&dataset.ml)?;
+    let csca_ml = ml.list()?;
+
+    ensure!(csca_ml.version == 0);
+
+    Ok(())
+}
+
+#[test]
+fn test_decode_crl_local() -> Result<()> {
+    let dataset = DEPKI::load()?;
+    let crl = CRL::from_der(&dataset.crl)?;
+
+    let _sig_algo = SignatureAlgorithmIdentifier::from_der(&crl.0.signature_algorithm.to_der()?);
+
+    Ok(())
+}
+
+#[test]
+fn test_decode_crl_online_from_cert() -> Result<()> {
+    let dataset = DEPKI::load()?;
+    let csca = Certificate::CSCA(X509Certificate::from_der(&dataset.csca)?);
+    let crl = CRL::from_distribution_point(&csca)?;
+
+    let _sig_algo = SignatureAlgorithmIdentifier::from_der(&crl.0.signature_algorithm.to_der()?);
+
+    Ok(())
+}
+
+#[test]
+fn test_decode_crl_online_from_pkd() -> Result<()> {
+    let crl = CRL::from_pkd("SGP")?; // Singapore CRL
+
+    let _sig_algo = SignatureAlgorithmIdentifier::from_der(&crl.0.signature_algorithm.to_der()?);
+
+    Ok(())
+}
+
+#[test]
+fn test_decode_deviation_list() -> Result<()> {
+    let dataset = DEPKI::load()?;
+    let dvl = DeviationList::from_der(&dataset.dvl)?;
+    let list = dvl.list()?;
+
+    ensure!(list.version == 0);
 
     Ok(())
 }

@@ -1,10 +1,11 @@
+pub mod pki;
 pub mod security_info;
 
 use {
     self::security_info::{
         ChipAuthenticationInfo, ChipAuthenticationPublicKeyInfo, SecurityInfo, SecurityInfos,
     },
-    super::{ApplicationTagged, ContentInfo, ContentType, DigestAlgorithmIdentifier},
+    super::{ApplicationTagged, ContentInfo, ContentType, DigestAlgorithmIdentifier, public_key_info::SubjectPublicKeyInfo},
     crate::ensure_err,
     cms::signed_data::{EncapsulatedContentInfo, SignedData, SignerInfo},
     der::{
@@ -23,6 +24,11 @@ pub type EfCardAccess = SecurityInfos;
 ///
 /// See ICAO-9303-10 3.11.4
 pub type EfDg14 = ApplicationTagged<14, SecurityInfos>;
+
+/// EF_DG15 is a [`SubjectPublicKeyInfo`] with no further wrapping.
+///
+/// See ICAO-9303-11 6.1.5
+pub type EfDg15 = ApplicationTagged<15, SubjectPublicKeyInfo>;
 
 /// EF_SOD is a wrapped [`SignedData`] structure.
 ///
@@ -97,6 +103,12 @@ impl EfDg14 {
             _ => None,
         })?;
         Some((ca, capk))
+    }
+}
+
+impl EfDg15 {
+    pub fn active_authentication(&self) -> &SubjectPublicKeyInfo {
+        &self.0
     }
 }
 

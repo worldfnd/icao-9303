@@ -59,6 +59,7 @@ num-traits = "0.2.19"
 num_enum = "0.7.3"
 pcsc = { version = "2.9", optional = true }
 rand = "0.8.5"
+reqwest = { version = "0.12", features = ["blocking"] }
 ruint = { version = "1.12.4", features = [
     "rand",
     "subtle",
@@ -68,6 +69,7 @@ ruint = { version = "1.12.4", features = [
 rusb = { version = "0.9.4", optional = true }
 sha1 = "0.10.6"
 sha2 = "0.10.8"
+spki = "0.7"
 subtle = "2.6.1"
 thiserror = "1.0.64"
 trace = "0.1.7"
