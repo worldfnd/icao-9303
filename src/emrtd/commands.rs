@@ -1,12 +1,7 @@
 use {
-<<<<<<< HEAD
     super::{iso7816::Apdu, Emrtd},
     anyhow::{ensure, Result},
     bytes::Buf,
-=======
-    super::Emrtd,
-    anyhow::{anyhow, ensure, Result},
->>>>>>> a207199 (Add `Emrtd::commands()` dispatcher)
 };
 
 pub struct Commands<'a> {
