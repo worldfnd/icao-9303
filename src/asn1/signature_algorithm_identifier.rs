@@ -38,6 +38,7 @@ pub enum SignatureAlgorithmIdentifier {
     RsaPkcsSha384,
     RsaPkcsSha512,
     RsaPss(RsaPssParameters),
+    RsaIso9796withMR,
     Unknown(AnyAlgorithmIdentifier),
 }
 

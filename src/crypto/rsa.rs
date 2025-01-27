@@ -54,6 +54,9 @@ impl<U: UintMont> RSAPublicKey<U> {
             SignatureAlgorithmIdentifier::RsaPss(params) => {
                 self.verify_pss(message, signature, params)
             }
+            SignatureAlgorithmIdentifier::RsaIso9796withMR => {
+                self.verify_iso9796(message, signature)
+            }
             _ => bail!("Unrecognized RSA signature algorithm"),
         }
     }
@@ -218,6 +221,71 @@ impl<U: UintMont> RSAPublicKey<U> {
         t.extend_from_slice(&digest);
 
         ensure!(t_prime == t, "RSA PKCS#1 verification: DigestInfo mismatch");
+
+        Ok(())
+    }
+
+    pub fn verify_iso9796<'s>(
+        &'s self,
+        message: &[u8],
+        signature: ModRingElementRef<'s, U>,
+    ) -> Result<()> {
+        ensure!(signature.ring() == &self.ring);
+
+        let f_elem = signature.pow_ct(self.public_exponent);
+        let f_len = (self.ring.modulus().significant_bits() + 7) / 8;
+        let bytes = f_elem.to_uint().to_be_bytes();
+        let f = bytes[bytes.len() - f_len..].to_vec();
+
+        // Trailer bytes indicate the hashing algo
+        let (digest_algo, lh, t) = match f[..] {
+            [.., 0xbc] => (
+                DigestAlgorithmIdentifier::Sha1(DigestAlgorithmParameters::Null),
+                20,
+                1,
+            ),
+            [.., 0x38, 0xcc] => (
+                DigestAlgorithmIdentifier::Sha224(DigestAlgorithmParameters::Null),
+                28,
+                2,
+            ),
+            [.., 0x34, 0xcc] => (
+                DigestAlgorithmIdentifier::Sha256(DigestAlgorithmParameters::Null),
+                32,
+                2,
+            ),
+            [.., 0x36, 0xcc] => (
+                DigestAlgorithmIdentifier::Sha384(DigestAlgorithmParameters::Null),
+                48,
+                2,
+            ),
+            [.., 0x35, 0xcc] => (
+                DigestAlgorithmIdentifier::Sha512(DigestAlgorithmParameters::Null),
+                64,
+                2,
+            ),
+            _ => bail!("Trailer bytes not recognized"),
+        };
+
+        let c = self.ring.modulus().bit_len() - 8 * lh - 8 * t - 4;
+        let lm1 = (c - 4) / 8;
+
+        let digest_start = f.len() - lh - t;
+        let digest = &f[digest_start..digest_start + lh];
+
+        let m1_start = f.len() - lh - t - lm1;
+        let m1 = &f[m1_start..m1_start + lm1];
+
+        let mut m_star = Vec::with_capacity(lm1 + message.len());
+        m_star.extend_from_slice(m1);
+        m_star.extend_from_slice(message);
+
+        let digest_prime = digest_algo.hash_bytes(&m_star);
+
+        ensure!(
+            digest_prime == digest,
+            "RSA ISO9796 verification: digest mismatch"
+        );
 
         Ok(())
     }
