@@ -26,6 +26,17 @@ impl<'a> Commands<'a> {
         Ok(data)
     }
 
+    /// Send INTERNAL AUTHENTICATE command.
+    pub fn internal_authenticate(&mut self, data: &[u8]) -> Result<Vec<u8>> {
+        let apdu = Apdu::new(0x00, 0x88, 0x00, 0x00, None)
+            .push_bytes(data)
+            .build()?;
+
+        let (status, data) = self.card.send_apdu(&apdu)?;
+        ensure!(status.is_success(), "Failed to authenticate: {}", status);
+        Ok(data)
+    }
+
     /// Send EXTERNAL AUTHENTICATE command.
     pub fn external_authenticate(&mut self, data: &[u8]) -> Result<Vec<u8>> {
         ensure!(data.len() == 0x28);
