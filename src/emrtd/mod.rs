@@ -2,13 +2,17 @@
 
 mod bac;
 mod chip_authentication;
+mod commands;
 mod files;
 mod pace;
 pub mod secure_messaging;
 
 pub use self::files::{DedicatedId, FileId, HasFileId};
 use {
-    self::secure_messaging::{PlainText, SecureMessaging},
+    self::{
+        commands::Commands,
+        secure_messaging::{PlainText, SecureMessaging},
+    },
     crate::{
         iso7816::{self, StatusWord},
         nfc::NfcReader,
@@ -97,6 +101,11 @@ impl Emrtd {
 
     pub fn set_secure_messaging(&mut self, secure_messaging: Box<dyn SecureMessaging>) {
         self.secure_messaging = secure_messaging;
+    }
+
+    /// Commands dispatcher
+    pub fn commands(&mut self) -> Commands {
+        Commands::new(self)
     }
 
     pub fn send_apdu(&mut self, apdu: &[u8]) -> Result<(StatusWord, Vec<u8>)> {
