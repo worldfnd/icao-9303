@@ -1,7 +1,10 @@
 mod status_word;
 
 pub use self::status_word::StatusWord;
-use thiserror::Error;
+use {
+    anyhow::{anyhow, Result},
+    thiserror::Error,
+};
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -19,6 +22,86 @@ pub enum Error {
 
     #[error("Invalid Extended APDU: Trailing bytes.")]
     ExtendedApduTooLong,
+}
+
+// TODO handle extended lengths
+#[derive(Debug, Clone)]
+pub struct Apdu {
+    header:       [u8; 4],
+    data:         Vec<u8>,
+    dynamic_auth: bool,
+}
+
+impl Apdu {
+    pub fn new(cla: u8, ins: u8, p1: u8, p2: u8) -> Self {
+        let header = [cla, ins, p1, p2];
+        // Lets assume a short APDU by default
+        let data = Vec::with_capacity(255);
+        Self {
+            header,
+            data,
+            dynamic_auth: false,
+        }
+    }
+
+    /// Pushes bytes into the APDU data field. Constructs the TLV sequence.
+    pub fn push(&mut self, tag: u8, data: &[u8]) -> Result<&mut Self> {
+        let len = u8::try_from(data.len())?;
+        self.data.push(tag);
+        self.data.push(len);
+        self.data.extend_from_slice(data);
+        Ok(self)
+    }
+
+    pub fn dynamic_auth(&mut self) -> &mut Self {
+        self.dynamic_auth = true;
+        self
+    }
+
+    /// Command chaining. Must be called if this is not the last APDU in the
+    /// chain.
+    pub fn chain(&mut self) -> &mut Self {
+        self.header[0] |= 0x10;
+        self
+    }
+
+    /// Builds the APDU, with an expected response length `rlen`.
+    /// If `rlen` is `None`, then a response of 256 bytes is assumed.
+    pub fn build(&self, rlen: Option<u8>) -> Result<Vec<u8>> {
+        // le == 0x00 equates to a 256 bytes response
+        let dyn_auth_len: u8 = if self.dynamic_auth { 2 } else { 0 };
+        let data_len = u8::try_from(self.data.len())?;
+        let le_present = rlen.is_some_and(|len| len != 0) || rlen.is_none();
+        let len = 4 // header
+            + 1 // lc
+            + dyn_auth_len as usize
+            + data_len as usize
+            + le_present as usize;
+
+        let mut apdu = Vec::with_capacity(len);
+        // header
+        apdu.extend_from_slice(&self.header);
+        // lc
+        apdu.push(
+            dyn_auth_len
+                .checked_add(data_len)
+                .ok_or_else(|| anyhow!("Dynamic authentication object too large"))?,
+        );
+        // data
+        if self.dynamic_auth {
+            apdu.push(0x7c);
+            apdu.push(data_len);
+        }
+        if self.data.len() > 0 {
+            apdu.extend_from_slice(&self.data);
+        }
+        // le
+        if le_present {
+            apdu.push(rlen.unwrap_or(0));
+        }
+
+        Ok(apdu)
+    }
 }
 
 #[derive(Debug)]
