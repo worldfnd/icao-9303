@@ -1,10 +1,7 @@
 mod status_word;
 
 pub use self::status_word::StatusWord;
-use {
-    anyhow::{anyhow, Result},
-    thiserror::Error,
-};
+use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -22,6 +19,9 @@ pub enum Error {
 
     #[error("Invalid Extended APDU: Trailing bytes.")]
     ExtendedApduTooLong,
+
+    #[error("Failed building APDU: {0}")]
+    BuildFailure(#[from] anyhow::Error),
 }
 
 // TODO handle extended lengths
@@ -29,28 +29,38 @@ pub enum Error {
 pub struct Apdu {
     header:       [u8; 4],
     data:         Vec<u8>,
+    rlen:         Option<u8>,
     dynamic_auth: bool,
 }
 
 impl Apdu {
-    pub fn new(cla: u8, ins: u8, p1: u8, p2: u8) -> Self {
+    /// Creates an empty APDU, with an expected response length `rlen`.
+    /// If `rlen` is `None`, then a response of 256 bytes is assumed.
+    pub fn new(cla: u8, ins: u8, p1: u8, p2: u8, rlen: Option<u8>) -> Self {
         let header = [cla, ins, p1, p2];
         // Lets assume a short APDU by default
         let data = Vec::with_capacity(255);
         Self {
             header,
             data,
+            rlen,
             dynamic_auth: false,
         }
     }
 
-    /// Pushes bytes into the APDU data field. Constructs the TLV sequence.
-    pub fn push(&mut self, tag: u8, data: &[u8]) -> Result<&mut Self> {
+    /// Pushes bytes into the APDU data field. Constructs a TLV sequence.
+    pub fn push_tlv(&mut self, tag: u8, data: &[u8]) -> anyhow::Result<&mut Self> {
         let len = u8::try_from(data.len())?;
         self.data.push(tag);
         self.data.push(len);
         self.data.extend_from_slice(data);
         Ok(self)
+    }
+
+    /// Pushes raw bytes into the APDU data field.
+    pub fn push_bytes(&mut self, data: &[u8]) -> &mut Self {
+        self.data.extend_from_slice(data);
+        self
     }
 
     pub fn dynamic_auth(&mut self) -> &mut Self {
@@ -65,15 +75,13 @@ impl Apdu {
         self
     }
 
-    /// Builds the APDU, with an expected response length `rlen`.
-    /// If `rlen` is `None`, then a response of 256 bytes is assumed.
-    pub fn build(&self, rlen: Option<u8>) -> Result<Vec<u8>> {
+    pub fn build(&self) -> anyhow::Result<Vec<u8>> {
         // le == 0x00 equates to a 256 bytes response
         let dyn_auth_len: u8 = if self.dynamic_auth { 2 } else { 0 };
         let data_len = u8::try_from(self.data.len())?;
-        let le_present = rlen.is_some_and(|len| len != 0) || rlen.is_none();
+        let le_present = self.rlen.is_some_and(|len| len != 0) || self.rlen.is_none();
         let len = 4 // header
-            + 1 // lc
+            + (dyn_auth_len + data_len != 0) as usize  // lc
             + dyn_auth_len as usize
             + data_len as usize
             + le_present as usize;
@@ -82,11 +90,9 @@ impl Apdu {
         // header
         apdu.extend_from_slice(&self.header);
         // lc
-        apdu.push(
-            dyn_auth_len
-                .checked_add(data_len)
-                .ok_or_else(|| anyhow!("Dynamic authentication object too large"))?,
-        );
+        if dyn_auth_len + data_len != 0 {
+            apdu.push((dyn_auth_len + data_len).try_into()?);
+        }
         // data
         if self.dynamic_auth {
             apdu.push(0x7c);
@@ -97,7 +103,7 @@ impl Apdu {
         }
         // le
         if le_present {
-            apdu.push(rlen.unwrap_or(0));
+            apdu.push(self.rlen.unwrap_or(0));
         }
 
         Ok(apdu)
