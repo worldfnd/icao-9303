@@ -38,7 +38,7 @@ impl Emrtd {
         // For AES we need to use 6.2.4.2
 
         // Send MSE Set AT to select the Chip Authentication protocol.
-        self.mset_at(ca.protocol.into(), pk.key_id)?;
+        self.mset_at_ca(ca.protocol.into(), pk.key_id)?;
 
         // Send the public key using general authenticate
         let data = self.general_authenticate(public_key.as_ref())?;
@@ -51,7 +51,7 @@ impl Emrtd {
         Ok(())
     }
 
-    pub fn mset_at(&mut self, protocol: Oid, key_id: Option<u64>) -> Result<()> {
+    pub fn mset_at_ca(&mut self, protocol: Oid, key_id: Option<u64>) -> Result<()> {
         // Send MSE Set AT to select the Chip Authentication protocol.
         let mut apdu = vec![0x00, 0x22, 0x41, 0xa4];
         apdu.push(0x00); // Placeholder length
