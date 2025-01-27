@@ -1,5 +1,6 @@
 //! Library for interacting with an ICAO 9303 compliant eMRTD.
 
+mod active_authentication;
 mod bac;
 mod chip_authentication;
 mod commands;
