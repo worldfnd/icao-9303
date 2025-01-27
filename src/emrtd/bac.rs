@@ -4,7 +4,7 @@ use {
         secure_messaging::{tdes::TDesCipher, Cipher, Encrypted},
         seed_from_mrz, Emrtd,
     },
-    anyhow::{anyhow, ensure, Result},
+    anyhow::{ensure, Result},
     rand::Rng,
     std::array,
 };
