@@ -41,7 +41,7 @@ impl Emrtd {
         self.mset_at(ca.protocol.into(), pk.key_id)?;
 
         // Send the public key using general authenticate
-        let data = self.general_authenticate(public_key.as_ref())?;
+        let data = self.general_authenticate(&public_key.to_bytes())?;
         println!("==> General Authenticate: {}", hex::encode(data));
 
         // Keys should now have been changed.
