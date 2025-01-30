@@ -2,16 +2,16 @@
 
 use {
     super::{
+        codec::parse_ec_point,
         groups::{EllipticCurve, EllipticCurvePoint},
         mod_ring::{ModRingElementRef, RingRefExt, UintMont},
     },
     crate::asn1::{
-        public_key_info::{ECAlgoParameters, EcPublicKeyInfo, FieldId},
+        public_key_info::{ECAlgoParameters, EcPublicKeyInfo},
         DigestAlgorithmIdentifier, DigestAlgorithmParameters, SignatureAlgorithmIdentifier,
     },
     anyhow::{anyhow, bail, ensure, Result},
     num_traits::Inv,
-    ruint::{aliases::U512, Uint},
 };
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -87,36 +87,15 @@ impl<U: UintMont> ECPublicKey<U> {
     }
 }
 
-impl<const B: usize, const L: usize> TryFrom<(ECAlgoParameters, EcPublicKeyInfo)>
-    for ECPublicKey<Uint<B, L>>
-{
+impl<U: UintMont> TryFrom<(ECAlgoParameters, EcPublicKeyInfo)> for ECPublicKey<U> {
     type Error = anyhow::Error;
 
     fn try_from(info: (ECAlgoParameters, EcPublicKeyInfo)) -> Result<Self> {
         let (params, key) = info;
         let point_bytes = key.point.as_bytes();
-        let curve = match params {
-            ECAlgoParameters::EcParameters(params) => match params.field_id {
-                FieldId::PrimeField { modulus } => {
-                    let p = Uint::try_from(modulus)?;
-                    let a = Uint::from_be_slice(params.curve.a.as_bytes());
-                    let b = Uint::from_be_slice(params.curve.b.as_bytes());
-                    let (x, y) = parse_ec_point(params.base.as_bytes())?;
-                    let order = Uint::try_from(params.order)?;
-                    let cofactor = Uint::try_from(
-                        params
-                            .cofactor
-                            .ok_or_else(|| anyhow!("Missing cofactor in EcParameters"))?,
-                    )?;
+        let curve = EllipticCurve::from_parameters(params)?;
 
-                    EllipticCurve::new(p, a, b, x, y, order, cofactor)?
-                }
-                _ => todo!(),
-            },
-            _ => todo!(),
-        };
-
-        let (x, y) = parse_ec_point(point_bytes)?;
+        let (x, y) = parse_ec_point(&curve, point_bytes)?;
         Ok(Self {
             curve,
             point: (x, y),
@@ -124,21 +103,13 @@ impl<const B: usize, const L: usize> TryFrom<(ECAlgoParameters, EcPublicKeyInfo)
     }
 }
 
-fn parse_ec_point<const B: usize, const L: usize>(
-    octet_string: &[u8],
-) -> Result<(Uint<B, L>, Uint<B, L>)> {
-    ensure!(
-        octet_string[0] == 0x04,
-        "Only uncompressed EC point supported, TODO others"
-    );
-
-    let coords = &octet_string[1..];
-    let (x_bytes, y_bytes) = coords.split_at(coords.len() / 2);
-
-    let x = Uint::from_be_slice(x_bytes);
-    let y = Uint::from_be_slice(y_bytes);
-
-    Ok((x, y))
+impl<'a, U: UintMont> From<EllipticCurvePoint<'a, U>> for ECPublicKey<U> {
+    fn from(point: EllipticCurvePoint<U>) -> Self {
+        ECPublicKey {
+            curve: point.curve().clone(),
+            point: (point.x().unwrap().to_uint(), point.y().unwrap().to_uint()),
+        }
+    }
 }
 
 #[cfg(test)]

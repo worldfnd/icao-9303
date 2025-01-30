@@ -1,9 +1,13 @@
 use {
     super::{
-        super::mod_ring::{ModRing, ModRingElementRef, RingRefExt, UintExp, UintMont},
+        super::{
+            codec::parse_ec_point_uncompressed,
+            mod_ring::{ModRing, ModRingElementRef, RingRefExt, UintExp, UintMont},
+        },
         CryptoGroup,
     },
-    anyhow::{ensure, Result},
+    crate::asn1::public_key_info::{ECAlgoParameters, FieldId},
+    anyhow::{anyhow, ensure, Result},
     num_traits::Inv,
     std::{
         fmt::{self, Debug, Formatter},
@@ -88,6 +92,33 @@ impl<U: UintMont> EllipticCurve<U> {
             "Generator order mismatch"
         );
 
+        Ok(curve)
+    }
+
+    pub fn from_parameters(params: ECAlgoParameters) -> Result<Self> {
+        let curve = match params {
+            ECAlgoParameters::EcParameters(params) => match params.field_id {
+                FieldId::PrimeField { modulus } => {
+                    let p = U::try_from(modulus)
+                        .map_err(|_| anyhow!("Failed converting modulus Int"))?;
+                    let a = U::from_be_bytes(params.curve.a.as_bytes());
+                    let b = U::from_be_bytes(params.curve.b.as_bytes());
+                    let (x, y) = parse_ec_point_uncompressed(params.base.as_bytes())?;
+                    let order = U::try_from(params.order)
+                        .map_err(|_| anyhow!("Failed converting order Int"))?;
+                    let cofactor = U::try_from(
+                        params
+                            .cofactor
+                            .ok_or_else(|| anyhow!("Missing cofactor in EcParameters"))?,
+                    )
+                    .map_err(|_| anyhow!("Failed converting cofactor Int"))?;
+
+                    EllipticCurve::new(p, a, b, x, y, order, cofactor)?
+                }
+                _ => todo!(),
+            },
+            _ => todo!(),
+        };
         Ok(curve)
     }
 
@@ -229,7 +260,7 @@ impl<'a, U: UintMont> EllipticCurvePoint<'a, U> {
         }
     }
 
-    fn mul_uint<W: UintExp>(mut self, scalar: W) -> Self {
+    pub fn mul_uint<W: UintExp>(mut self, scalar: W) -> Self {
         let mut result = self.curve.infinity();
         for i in 0..scalar.bit_len() {
             result.conditional_assign(&(result + self), scalar.bit_ct(i));

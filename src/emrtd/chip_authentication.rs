@@ -41,9 +41,9 @@ impl Emrtd {
         self.mset_at_chip_auth(ca.protocol.into(), pk.key_id)?;
 
         // Send the public key using general authenticate
-        let data = self
+        self
             .commands()
-            .general_authenticate(&[(0x80, public_key.as_ref())], true)?;
+            .general_authenticate(&[(0x80, &public_key.to_bytes())], true)?;
         println!("==> General Authenticate OK");
 
         // Keys should now have been changed.

@@ -1,5 +1,7 @@
 use {
     super::{
+        codec::{BsiTr031111Codec, BufMutCodec},
+        dh::DHPublicKey,
         ecdsa::{ECPublicKey, ECSignature},
         mod_ring::RingRefExt,
         rsa::RSAPublicKey,
@@ -8,7 +10,7 @@ use {
         public_key_info::SubjectPublicKeyInfo, signature_algorithm_identifier::EcdsaSigValue,
         SignatureAlgorithmIdentifier,
     },
-    anyhow::Result,
+    anyhow::{bail, Result},
     der::{Decode, Encode},
     ruint::{aliases::*, Uint},
 };
@@ -17,11 +19,13 @@ type U521 = Uint<521, 9>;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PublicKey {
+    DH(DHPublicKey<U4096, U4096>),
     EC(ECPublicKey<U521>),
     RSA(RSAPublicKey<U4096>),
 }
 
 impl PublicKey {
+    /// Verify a signature
     pub fn verify(
         &self,
         message: &[u8],
@@ -52,6 +56,26 @@ impl PublicKey {
 
                 key.verify(message, rsasig, signature_algorithm)
             }
+            _ => bail!("Not possible verifying signatures with {:?}", self),
+        }
+    }
+
+    /// Returns the public key as bytes following the BSI TR-03111
+    /// representation
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let codec = BsiTr031111Codec::default();
+        match self {
+            PublicKey::DH(key) => {
+                let mut bytes = Vec::new();
+                bytes.put_codec(&codec, key.key);
+                bytes
+            }
+            PublicKey::EC(key) => {
+                let mut bytes = Vec::new();
+                bytes.put_codec(&codec, key.point().unwrap());
+                bytes
+            }
+            _ => todo!(),
         }
     }
 }
