@@ -78,14 +78,14 @@ impl EfDg14 {
                 &ChipAuthenticationInfo {
                     protocol: ChipAuthenticationProtocol {
                         key_agreement: KeyAgreement::Ecdh, // TODO: From pubkey
-                        cipher:        Some(SymmetricCipher::Tdes),
+                        cipher:        SymmetricCipher::Tdes,
                     },
                     version:  1,
                     key_id:   None,
                 },
             );
         // Do some verification checks
-        if ca.protocol.cipher.is_none() || ca.version != 1 {
+        if ca.version != 1 {
             // TODO: Error message
             return None;
         }
