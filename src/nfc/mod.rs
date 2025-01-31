@@ -1,3 +1,4 @@
+mod pcsc;
 mod proxmark3;
 
 use {crate::iso7816::StatusWord, anyhow::Result};
@@ -6,6 +7,7 @@ use {crate::iso7816::StatusWord, anyhow::Result};
 pub enum CardType {
     A(CardTypeA),
     B(CardTypeB),
+    Abstract,
 }
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
@@ -45,6 +47,36 @@ pub trait NfcReader {
     fn send_apdu(&mut self, apdu: &[u8]) -> Result<(StatusWord, Vec<u8>)>;
 }
 
+/// Tries to connect to either the PCSC daemon or a Proxmark3 device
 pub fn connect_reader() -> Result<Box<dyn NfcReader>> {
-    Ok(Box::new(proxmark3::Proxmark3::new()?))
+    let mut errors = Vec::new();
+
+    #[cfg(feature = "pcsc")]
+    // Connect to the daemon
+    match pcsc::PCSC::init() {
+        Ok(mut reader) => {
+            // Connect to the card
+            match reader.connect() {
+                Ok(()) => return Ok(Box::new(reader) as Box<dyn NfcReader>),
+                Err(e) => errors.push(("PCSC", e)),
+            }
+        }
+        Err(e) => errors.push(("PCSC", e)),
+    }
+
+    #[cfg(feature = "proxmark3")]
+    match proxmark3::Proxmark3::new() {
+        Ok(reader) => return Ok(Box::new(reader) as Box<dyn NfcReader>),
+        Err(e) => errors.push(("Proxmark3", e)),
+    }
+
+    let error_msg = errors
+        .iter()
+        .map(|(name, err)| format!("  {name}: {err}"))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    Err(anyhow::anyhow!(
+        "Failed connecting to card using any reader:\n{error_msg}"
+    ))
 }
