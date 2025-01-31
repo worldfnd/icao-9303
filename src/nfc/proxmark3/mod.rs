@@ -31,7 +31,7 @@ pub enum Command {
     Hf14bReader      = 0x0305,
 }
 
-#[repr(i16)]
+#[repr(i8)]
 pub enum Status {
     Success            = 0,
     UndefinedError     = -1,
@@ -51,6 +51,18 @@ trait Connection {
     fn read(&mut self, buffer: &mut [u8]) -> Result<()>;
     fn write(&mut self, data: &[u8]) -> Result<()>;
     fn close(self) -> Result<()>;
+}
+
+/// Macro to check if a Proxmark3 command status is successful
+macro_rules! ensure_success {
+    ($status:expr) => {
+        ensure!(
+            $status.0 == Status::Success as i8,
+            "Received error {} with reason {:#02x}",
+            $status.0,
+            $status.1
+        )
+    };
 }
 
 impl Proxmark3 {
@@ -85,14 +97,14 @@ impl Proxmark3 {
         let data: [u8; 32] = array::from_fn(|i| i as u8);
         self.send_command_ng(Command::Ping, &data)?;
         let (status, cmd, response) = self.receive_response()?;
-        ensure!(status == Status::Success as i16);
+        ensure_success!(status);
         ensure!(cmd == Command::Ping as u16);
         ensure!(response == data);
 
         // Check capabilities
         self.send_command_ng(Command::Capabilities, &[])?;
         let (status, cmd, response) = self.receive_response()?;
-        ensure!(status == Status::Success as i16);
+        ensure_success!(status);
         ensure!(cmd == Command::Capabilities as u16);
         // See https://github.com/RfidResearchGroup/proxmark3/blob/55ef252a5d0d590026a4959a4c1b7a6028d1ad13/include/pm3_cmd.h#L174
         ensure!(response.len() == 13);
@@ -100,7 +112,7 @@ impl Proxmark3 {
         // Check version
         self.send_command_ng(Command::Version, &[])?;
         let (status, cmd, response) = self.receive_response()?;
-        ensure!(status == Status::Success as i16);
+        ensure_success!(status);
         ensure!(cmd == Command::Version as u16);
         // https://github.com/RfidResearchGroup/proxmark3/blame/55ef252a5d0d590026a4959a4c1b7a6028d1ad13/client/src/cmdhw.c#L1560
         let mut response = &response[..];
@@ -124,7 +136,7 @@ impl Proxmark3 {
         // https://github.com/RfidResearchGroup/proxmark3/blob/55ef252a5d0d590026a4959a4c1b7a6028d1ad13/include/mifare.h#L88
         self.send_command_mix(Command::Hf14aReader, 3, 0, 0, &[])?; // 3 = CONNECT | NO_DISCONNECT
         let (status, cmd, response) = self.receive_response()?;
-        ensure!(status == Status::Success as i16);
+        ensure_success!(status);
         ensure!(cmd == Command::Ack as u16);
         let mut response = &response[..];
         ensure!(response.len() >= 24);
@@ -165,11 +177,11 @@ impl Proxmark3 {
         self.hf14b(0x0841, &[])?;
         let (status, cmd, response) = self.receive_response()?;
         ensure!(cmd == Command::Hf14bReader as u16);
-        if status == Status::CardExchangeFailed as i16 {
+        if status.0 == Status::CardExchangeFailed as i8 {
             // TODO: Retry with SELECT_SR and then with SELECT_CTS
             return Ok(None);
         }
-        ensure!(status == Status::Success as i16);
+        ensure_success!(status);
 
         // Parse response as iso14b_card_select_t
         ensure!(response.len() == 20);
@@ -195,7 +207,7 @@ impl Proxmark3 {
         // 6 = SEND_APDU | NO_DISCONNECT
         self.send_command_mix(Command::Hf14aReader, 6, apdu.len() as u64, 0, apdu)?;
         let (status, cmd, response) = self.receive_response()?;
-        ensure!(status == Status::Success as i16);
+        ensure_success!(status);
         ensure!(cmd == Command::Ack as u16);
         ensure!(response.len() == 512);
         let mut response = &response[..];
@@ -224,7 +236,7 @@ impl Proxmark3 {
         // TODO: Support send chaining.
         self.hf14b(0x0004, data_in)?;
         let (status, cmd, response) = self.receive_response()?;
-        ensure!(status == Status::Success as i16);
+        ensure_success!(status);
         ensure!(cmd == Command::Hf14bReader as u16);
         ensure!(response.len() >= 5);
         // Parse Header
@@ -291,7 +303,7 @@ impl Proxmark3 {
         Ok(())
     }
 
-    fn receive_response(&mut self) -> Result<(i16, u16, Vec<u8>)> {
+    fn receive_response(&mut self) -> Result<((i8, i8), u16, Vec<u8>)> {
         let mut header = [0_u8; 10];
         self.connection.read(&mut header)?;
 
@@ -306,7 +318,8 @@ impl Proxmark3 {
         let len = header.get_u16_le();
         let (len, _ng) = (len & 0x7fff, len & 0x8000 != 0);
         ensure!(len <= 512);
-        let status = header.get_i16_le();
+        let status = header.get_i8();
+        let reason = header.get_i8();
         let cmd = header.get_u16_le();
 
         // Read data
@@ -326,7 +339,7 @@ impl Proxmark3 {
         // }
         // println!("");
 
-        Ok((status, cmd, data))
+        Ok(((status, reason), cmd, data))
     }
 }
 
