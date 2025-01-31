@@ -55,10 +55,7 @@ fn main() -> Result<()> {
 
             // Construct secure messaging cipher and test messages
             const SELECT_MASTER_FILE: &[u8] = &hex!("00A4 000C 02 3F00");
-            let cipher = ca
-                .protocol
-                .cipher
-                .ok_or_else(|| anyhow!("No symmetric cipher"))?;
+            let cipher = ca.protocol.cipher;
             for i in 0..3 {
                 let mut sm = construct_secure_messaging(cipher, &shared_secret, 2 * i)?;
                 let msg = sm.enc_apdu(SELECT_MASTER_FILE)?;

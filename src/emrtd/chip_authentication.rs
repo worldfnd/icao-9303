@@ -2,6 +2,7 @@ use {
     super::Emrtd,
     crate::{
         asn1::emrtd::{security_info::SymmetricCipher, EfDg14},
+        crypto::PublicKey,
         emrtd::secure_messaging::construct_secure_messaging,
     },
     anyhow::Result,
@@ -22,6 +23,7 @@ impl Emrtd {
         // Find the Chip Authentication Info in DG14
         let (ca, pk) = ef_dg14.chip_authentication().unwrap();
         println!("Using algorithm: {}", ca.protocol);
+        let cipher = ca.protocol.cipher;
 
         let (algo, card_public_key) = pk.public_key.to_algorithm_public_key()?;
 
@@ -34,23 +36,43 @@ impl Emrtd {
         // Initiate Chip Authentication
         // ICAO-9303-11 section 6.2
         // 2. The terminal sends the public key to the eMRTD.
-        //
+        // For TDES we need to use 6.2.4.1
         // For AES we need to use 6.2.4.2
-
-        // Send MSE Set AT to select the Chip Authentication protocol.
-        self.mset_at_chip_auth(ca.protocol.into(), pk.key_id)?;
-
-        // Send the public key using general authenticate
-        self
-            .commands()
-            .general_authenticate(&[(0x80, &public_key.to_bytes())], true)?;
-        println!("==> General Authenticate OK");
+        match cipher {
+            SymmetricCipher::Tdes => {
+                // Send MSE Set KAT to select the Chip Authentication protocol.
+                self.mset_kat_chip_auth(&public_key, pk.key_id)?;
+            }
+            SymmetricCipher::Aes128 | SymmetricCipher::Aes192 | SymmetricCipher::Aes256 => {
+                // Send MSE Set AT to select the Chip Authentication protocol.
+                self.mset_at_chip_auth(ca.protocol.into(), pk.key_id)?;
+                // Send the public key using general authenticate
+                self.commands()
+                    .general_authenticate(&[(0x80, &public_key.to_bytes())], true)?;
+            }
+        }
+        println!("==> Chip Authentication OK");
 
         // Keys should now have been changed.
         let cipher = SymmetricCipher::Aes256;
         self.set_secure_messaging(construct_secure_messaging(cipher, &shared_secret, 0)?);
 
         Ok(())
+    }
+
+    fn mset_kat_chip_auth(&mut self, pk: &PublicKey, key_id: Option<u64>) -> Result<()> {
+        // Send MSE Set KAT (Key Agreement Template).
+        if let Some(id) = key_id {
+            self.commands().mset_at(0x41a6, &[
+                (0x91, &pk.to_bytes()),     // Ephemeral public key
+                (0x84, &[id.try_into()?]), // Key reference
+            ])
+        } else {
+            self.commands().mset_at(
+                0x41a6,
+                &[(0x91, &pk.to_bytes())], // Ephemeral public key
+            )
+        }
     }
 
     fn mset_at_chip_auth(&mut self, protocol: Oid, key_id: Option<u64>) -> Result<()> {

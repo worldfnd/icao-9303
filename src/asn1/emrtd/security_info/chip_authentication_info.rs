@@ -30,23 +30,18 @@ pub struct ChipAuthenticationPublicKeyInfo {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ChipAuthenticationProtocol {
     pub key_agreement: KeyAgreement,
-    pub cipher:        Option<SymmetricCipher>,
+    pub cipher:        SymmetricCipher,
 }
 
 impl ChipAuthenticationInfo {
     pub fn ensure_valid(self) {
-        assert!(self.protocol.cipher.is_some());
         assert_eq!(self.version, 1);
     }
 }
 
 impl Display for ChipAuthenticationProtocol {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "CA-{}", self.key_agreement)?;
-        if let Some(cipher) = self.cipher {
-            write!(f, "-{}", cipher)?;
-        }
-        Ok(())
+        write!(f, "CA-{}-{}", self.key_agreement, self.cipher)
     }
 }
 
@@ -78,12 +73,11 @@ impl TryFrom<Oid> for ChipAuthenticationProtocol {
             2 => KeyAgreement::Ecdh,
             _ => return Err(err),
         };
-        let cipher: Option<SymmetricCipher> = match oid.arc(10) {
-            None => None,
-            Some(1) => Some(SymmetricCipher::Tdes),
-            Some(2) => Some(SymmetricCipher::Aes128),
-            Some(3) => Some(SymmetricCipher::Aes192),
-            Some(4) => Some(SymmetricCipher::Aes256),
+        let cipher: SymmetricCipher = match oid.arc(10) {
+            Some(1) => SymmetricCipher::Tdes,
+            Some(2) => SymmetricCipher::Aes128,
+            Some(3) => SymmetricCipher::Aes192,
+            Some(4) => SymmetricCipher::Aes256,
             _ => return Err(err),
         };
         Ok(Self {
@@ -101,17 +95,13 @@ impl From<ChipAuthenticationProtocol> for Oid {
                 KeyAgreement::Ecdh => 2,
             })
             .unwrap();
-        if let Some(cipher) = ca.cipher {
-            oid.push_arc(match cipher {
-                SymmetricCipher::Tdes => 1,
-                SymmetricCipher::Aes128 => 2,
-                SymmetricCipher::Aes192 => 3,
-                SymmetricCipher::Aes256 => 4,
-            })
-            .unwrap()
-        } else {
-            oid
-        }
+        oid.push_arc(match ca.cipher {
+            SymmetricCipher::Tdes => 1,
+            SymmetricCipher::Aes128 => 2,
+            SymmetricCipher::Aes192 => 3,
+            SymmetricCipher::Aes256 => 4,
+        })
+        .unwrap()
     }
 }
 
