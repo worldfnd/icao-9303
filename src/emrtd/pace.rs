@@ -1,22 +1,64 @@
 use {
     super::Emrtd,
     crate::{asn1::public_key_info::EcParameters, crypto::cipher::aes::kdf_128},
+    crate::{asn1::emrtd::security_info::PaceInfo, crypto::CryptoCoreRng, emrtd::secure_messaging::aes::kdf_128},
     anyhow::Result,
-    rand::{CryptoRng, RngCore},
+    der::asn1::ObjectIdentifier as Oid,
     sha1::{Digest, Sha1},
 };
 
 pub const KDF_PACE: u32 = 3;
 
 impl Emrtd {
-    pub fn pace(&mut self, _rng: impl CryptoRng + RngCore, mrz: &str) -> Result<()> {
+    pub fn pace(&mut self, _rng: &mut impl CryptoCoreRng, mrz: &str, info: &PaceInfo) -> Result<()> {
         // Derive symmetric key K_pi
         let k = k_from_mrz(mrz);
         let _k_pi = kdf_128(&k[..], KDF_PACE)?;
 
         // Send MSE:Set AT.
+        let oid = Oid::from(info.protocol);
+        let protocol = oid.as_bytes();
+        self.commands().mset_at(0xc1a4, &[
+            (0x80, protocol), // Cryptographic mechanism reference, PACE
+            (0x83, &[0x01]),  // Reference of a key, MRZ
+        ])?;
 
-        // Send GENERAL AUTHENTICATE
+         // Send GENERAL AUTHENTICATE
+
+        // 1. Encrypted Nonce
+        let mut data = self.commands().general_authenticate(&[], false)?;
+        println!("{:?}", hex::encode(&data));
+        use {
+            super::{
+                pad,
+                super::crypto::cipher::{aes::*, tdes::*, Cipher, SMCipher},
+                seed_from_mrz,
+            },
+            crate::asn1::emrtd::security_info::SymmetricCipher,
+        };
+        let seed = seed_from_mrz(mrz);
+        match info.protocol.cipher.unwrap() {
+            SymmetricCipher::Tdes => {
+                let cipher = TDesCipher::from_seed(&seed)?;
+                pad(&mut data, cipher.block_size());
+                cipher.sm_dec(0, &mut data)?
+            }
+            SymmetricCipher::Aes128 => {
+                let cipher = Aes128Cipher::from_seed(&seed)?;
+                pad(&mut data, cipher.block_size());
+                cipher.sm_dec(0, &mut data)?
+            }
+            SymmetricCipher::Aes192 => {
+                let cipher = Aes192Cipher::from_seed(&seed)?;
+                pad(&mut data, cipher.block_size());
+                cipher.sm_dec(0, &mut data)?
+            }
+            SymmetricCipher::Aes256 => {
+                let cipher = Aes256Cipher::from_seed(&seed)?;
+                pad(&mut data, cipher.block_size());
+                cipher.sm_dec(0, &mut data)?
+            }
+        };
 
         todo!()
     }

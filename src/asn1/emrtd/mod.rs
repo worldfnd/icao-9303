@@ -3,10 +3,11 @@ pub mod security_info;
 
 use {
     self::security_info::{
-        ChipAuthenticationInfo, ChipAuthenticationPublicKeyInfo, SecurityInfo, SecurityInfos,
+        ChipAuthenticationInfo, ChipAuthenticationPublicKeyInfo, PaceInfo, SecurityInfo, SecurityInfos,
     },
     super::{ApplicationTagged, ContentInfo, ContentType, DigestAlgorithmIdentifier},
     crate::ensure_err,
+    anyhow::anyhow,
     cms::signed_data::{EncapsulatedContentInfo, SignedData, SignerInfo},
     der::{
         asn1::{ObjectIdentifier as Oid, OctetString, PrintableString},
@@ -57,6 +58,21 @@ pub struct DataGroupHash {
 impl ContentType for LdsSecurityObject {
     /// ICAO-9303-10 4.6.2.3
     const CONTENT_TYPE: Oid = Oid::new_unwrap("2.23.136.1.1.1");
+}
+
+impl EfCardAccess {
+    pub fn pace_info(&self) -> anyhow::Result<&PaceInfo> {
+        self.0
+            .iter()
+            .find_map(|info| {
+                if let SecurityInfo::Pace(pace) = info {
+                    Some(pace)
+                } else {
+                    None
+                }
+            })
+            .ok_or_else(|| anyhow!("PACE not supported"))
+    }
 }
 
 impl EfDg14 {
