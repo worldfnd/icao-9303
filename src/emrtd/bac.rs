@@ -4,37 +4,12 @@ use {
         secure_messaging::{tdes::TDesCipher, Cipher, Encrypted},
         seed_from_mrz, Emrtd,
     },
-    anyhow::{anyhow, ensure, Result},
+    anyhow::{ensure, Result},
     rand::Rng,
     std::array,
 };
 
 impl Emrtd {
-    /// Get random nonce for authentication.
-    ///
-    /// See ICAO 9303-11 section 4.3.4.1.
-    pub fn get_challenge(&mut self) -> Result<Vec<u8>> {
-        let (status, data) = self.send_apdu(&[0x00, 0x84, 0x00, 0x00, 0x08])?;
-        if !status.is_success() {
-            return Err(anyhow!("Failed to get challenge: {}", status));
-        }
-        ensure!(status.data_remaining() == None);
-        ensure!(data.len() == 8);
-        Ok(data)
-    }
-
-    pub fn external_authenticate(&mut self, data: &[u8]) -> Result<Vec<u8>> {
-        assert_eq!(data.len(), 0x28);
-        let mut apdu = vec![0x00, 0x82, 0x00, 0x00, 0x28];
-        apdu.extend_from_slice(data);
-        apdu.push(0x00);
-        let (status, data) = self.send_apdu(&apdu)?;
-        if !status.is_success() {
-            return Err(anyhow!("Failed to authenticate: {}", status));
-        }
-        Ok(data)
-    }
-
     pub fn basic_access_control(&mut self, rng: &mut impl Rng, mrz: &str) -> Result<()> {
         // eMRTD application must be selected
         self.select_emrtd_application()?;
@@ -48,7 +23,7 @@ impl Emrtd {
         let cipher = TDesCipher::from_seed(&seed);
 
         // GET CHALLENGE
-        let rnd_ic = self.get_challenge()?;
+        let rnd_ic = self.commands().get_challenge()?;
 
         // Construct authentication data
         let mut msg = vec![];
@@ -61,7 +36,7 @@ impl Emrtd {
         msg.extend(cipher.mac(0, &msg_mac));
 
         // EXTERNAL AUTHENTICATE
-        let mut resp_data = self.external_authenticate(&msg)?;
+        let mut resp_data = self.commands().external_authenticate(&msg)?;
         ensure!(resp_data.len() == 40);
 
         // Check MAC and decrypt response

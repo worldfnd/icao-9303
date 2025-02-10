@@ -4,7 +4,7 @@ use {
         asn1::emrtd::{security_info::SymmetricCipher, EfDg14},
         emrtd::secure_messaging::construct_secure_messaging,
     },
-    anyhow::{ensure, Result},
+    anyhow::Result,
     der::asn1::ObjectIdentifier as Oid,
     rand::{CryptoRng, RngCore},
 };
@@ -38,11 +38,13 @@ impl Emrtd {
         // For AES we need to use 6.2.4.2
 
         // Send MSE Set AT to select the Chip Authentication protocol.
-        self.mset_at(ca.protocol.into(), pk.key_id)?;
+        self.mset_at_chip_auth(ca.protocol.into(), pk.key_id)?;
 
         // Send the public key using general authenticate
-        let data = self.general_authenticate(public_key.as_ref())?;
-        println!("==> General Authenticate: {}", hex::encode(data));
+        let data = self
+            .commands()
+            .general_authenticate(&[(0x80, public_key.as_ref())], true)?;
+        println!("==> General Authenticate OK");
 
         // Keys should now have been changed.
         let cipher = SymmetricCipher::Aes256;
@@ -51,46 +53,18 @@ impl Emrtd {
         Ok(())
     }
 
-    pub fn mset_at(&mut self, protocol: Oid, key_id: Option<u64>) -> Result<()> {
+    fn mset_at_chip_auth(&mut self, protocol: Oid, key_id: Option<u64>) -> Result<()> {
         // Send MSE Set AT to select the Chip Authentication protocol.
-        let mut apdu = vec![0x00, 0x22, 0x41, 0xa4];
-        apdu.push(0x00); // Placeholder length
-
-        // Cryptographic mechanism: 0x80 <len> <OID>
-        let protocol = protocol.as_bytes();
-        apdu.push(0x80);
-        apdu.push(protocol.len().try_into()?);
-        apdu.extend_from_slice(protocol);
-
-        // If the pivate key to be used has a reference, include it.
         if let Some(id) = key_id {
-            apdu.push(0x84);
-            apdu.push(0x01); // Assume id < 256
-            apdu.push(id.try_into()?);
+            self.commands().mset_at(0x41a4, &[
+                (0x80, protocol.as_bytes()), // Cryptographic mechanism
+                (0x84, &[id.try_into()?]),   // Key reference
+            ])
+        } else {
+            self.commands().mset_at(
+                0x41a4,
+                &[(0x80, protocol.as_bytes())], // Cryptographic mechanism
+            )
         }
-
-        // Update length
-        apdu[4] = (apdu.len() - 5).try_into()?;
-
-        // Send MSE Set AT command to chip
-        let (status, data) = self.send_apdu(&apdu)?;
-        ensure!(status.is_success());
-        ensure!(data.is_empty());
-        Ok(())
-    }
-
-    pub fn general_authenticate(&mut self, public_key: &[u8]) -> Result<Vec<u8>> {
-        // Send General Authenticate command to chip
-        let mut apdu = vec![0x00, 0x86, 0x00, 0x00];
-        apdu.push((public_key.len() + 4).try_into()?);
-        apdu.push(0x7c);
-        apdu.push((public_key.len() + 2).try_into()?);
-        apdu.push(0x80);
-        apdu.push(public_key.len().try_into()?);
-        apdu.extend_from_slice(public_key);
-
-        let (status, data) = self.send_apdu(&apdu)?;
-        ensure!(status.is_success());
-        Ok(data)
     }
 }
