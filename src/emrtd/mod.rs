@@ -47,9 +47,6 @@ pub enum Error {
     #[error("Response Status: {0}")]
     ErrorResponse(StatusWord),
 
-    #[error("Secure Messaging failed (status: {0}).")]
-    SecureMessagingError(StatusWord),
-
     #[error("Invalid APDU: {0}")]
     InvalidApdu(#[from] iso7816::Error),
 
@@ -58,6 +55,12 @@ pub enum Error {
 
     #[error("Response exceeds maximum length.")]
     ResponseTooLong,
+
+    #[error("Secure Messaging failure: {0}")]
+    SMError(anyhow::Error),
+
+    #[error("Secure Messaging bad status: {0}.")]
+    SMBadStatus(StatusWord),
 
     #[error("Secure Messasing Response incomplete or incorrect.")]
     SMResponseInvalid,
@@ -126,7 +129,7 @@ impl Emrtd {
                 // Reset secure messaging.
                 self.set_secure_messaging(Box::new(PlainText));
 
-                return Err(Error::SecureMessagingError(status));
+                return Err(Error::SMBadStatus(status));
             }
             _ => {}
         }

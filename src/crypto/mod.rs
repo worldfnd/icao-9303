@@ -2,6 +2,7 @@
 //!
 //! Primarily based on TR-03111.
 
+pub mod cipher;
 mod codec;
 pub mod groups;
 pub mod mod_ring;
