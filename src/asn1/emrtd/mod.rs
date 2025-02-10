@@ -3,7 +3,8 @@ pub mod security_info;
 
 use {
     self::security_info::{
-        ChipAuthenticationInfo, ChipAuthenticationPublicKeyInfo, PaceInfo, SecurityInfo, SecurityInfos,
+        ChipAuthenticationInfo, ChipAuthenticationPublicKeyInfo, PaceInfo, SecurityInfo,
+        SecurityInfos,
     },
     super::{ApplicationTagged, ContentInfo, ContentType, DigestAlgorithmIdentifier},
     crate::ensure_err,

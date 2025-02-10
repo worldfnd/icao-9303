@@ -6,9 +6,9 @@ pub mod cipher;
 pub mod certificate;
 mod codec;
 mod dh;
-mod ecdsa;
+pub mod ecdsa;
 pub mod groups;
-mod key_agreement;
+pub mod key_agreement;
 pub mod mod_ring;
 mod pki;
 mod public_key;
@@ -17,14 +17,21 @@ mod signature;
 pub mod trust;
 
 use {
-    crate::asn1::public_key_info::SubjectPublicKeyInfo,
-    anyhow::{bail, ensure, Result},
+    crate::asn1::{
+        emrtd::security_info::{PaceInfo, StandardizedDomainParameter},
+        public_key_info::SubjectPublicKeyInfo,
+    },
+    anyhow::{anyhow, bail, ensure, Result},
     der::asn1::OctetString,
     rand::{CryptoRng, RngCore},
     ruint::Uint,
     std::any::Any,
 };
-pub use {codec::Codec, key_agreement::KeyAgreementAlgorithm, public_key::PublicKey};
+pub use {
+    codec::{BsiTr031111Codec, BufCodecParent, Codec},
+    key_agreement::KeyAgreementAlgorithm,
+    public_key::PublicKey,
+};
 
 pub trait CryptoCoreRng: CryptoRng + RngCore {}
 
@@ -36,7 +43,7 @@ impl<T> CryptoCoreRng for T where T: CryptoRng + RngCore {}
 // pub struct PublicKey(Vec<u8>);
 
 /// Opaque wrapper for private keys.
-pub struct PrivateKey(Box<dyn Any>);
+pub struct PrivateKey(pub Box<dyn Any>);
 
 // impl AsRef<[u8]> for PublicKey {
 //    fn as_ref(&self) -> &[u8] {
@@ -58,6 +65,23 @@ impl SubjectPublicKeyInfo {
             _ => bail!("Unknown key agreement algorithm."),
         };
         Ok(res)
+    }
+}
+
+impl PaceInfo {
+    pub fn kaa(&self) -> Result<Box<dyn KeyAgreementAlgorithm>> {
+        let id = self
+            .parameter_id
+            .ok_or_else(|| anyhow!("PaceInfo does not have parameterId set"))?;
+        match id.into() {
+            StandardizedDomainParameter::EcBrainpoolp256r1 => {
+                Ok(Box::new(groups::named::brainpool_p256r1_l()))
+            }
+            StandardizedDomainParameter::EcBrainpoolp320r1 => {
+                Ok(Box::new(groups::named::brainpool_p320r1_l()))
+            }
+            _ => todo!("{id}"),
+        }
     }
 }
 

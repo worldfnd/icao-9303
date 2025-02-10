@@ -29,12 +29,9 @@ fn main() -> Result<()> {
 
     // println!("=== Basic Access Control.");
     let mrz = env::var("MRZ")?;
-    card.basic_access_control(&mut rng, &mrz)
-        .context("Error during Basic Access Control.")?;
-    eprintln!("Basic Access Control successful.");
-
-    // let ef_sod = card.read_cached::<EfSod>()?;
-    // println!("DOCUMENT HASH = 0x{}", hex::encode(ef_sod.document_hash()));
+    card.chip_access(&mut rng, &mrz)
+        .map_err(|e| anyhow!("Error establishing secured access: {e}"))?;
+    eprintln!("Chip Access successful.");
 
     // Should be secured now!
     // Let's read some files.
@@ -65,7 +62,7 @@ fn main() -> Result<()> {
 
     // Do Chip Authentication
     card.chip_authenticate(&mut rng)
-        .context("Error during Chip Authentication.")?;
+       .context("Error during Chip Authentication.")?;
 
     Ok(())
 }

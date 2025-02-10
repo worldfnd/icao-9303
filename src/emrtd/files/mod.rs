@@ -49,15 +49,14 @@ impl Emrtd {
             return Ok(entry.clone());
         }
 
-        // TODO: PACE support required for MF
-        //// Select parent file if necessary.
-        // if self.parent != file.parent() {
-        //    if let Some(application_id) = file.parent().aid() {
-        //        self.select_dedicated_file(application_id)?;
-        //    } else {
-        //        self.select_master_file()?;
-        //    }
-        //}
+        // Select parent file if necessary.
+         if self.parent != file.parent() {
+            if let Some(application_id) = file.parent().aid() {
+                self.select_dedicated_file(application_id)?;
+            } else {
+                self.select_master_file()?;
+            }
+        }
 
         // Read file by short EF.
         let mut result: Option<Vec<u8>> = match self.read_binary_short_ef(file.short_id()) {

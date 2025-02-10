@@ -64,7 +64,7 @@ impl Emrtd {
         // Send MSE Set KAT (Key Agreement Template).
         if let Some(id) = key_id {
             self.commands().mset_at(0x41a6, &[
-                (0x91, &pk.to_bytes()),     // Ephemeral public key
+                (0x91, &pk.to_bytes()),    // Ephemeral public key
                 (0x84, &[id.try_into()?]), // Key reference
             ])
         } else {

@@ -78,7 +78,6 @@ impl<'a> Commands<'a> {
         for (tag, bytes) in data {
             apdu.push_tlv(*tag, bytes)?;
         }
-
         let (status, data) = self.card.send_apdu(&apdu.build()?)?;
         ensure!(status.is_success(), "Failed to authenticate: {}", status);
 

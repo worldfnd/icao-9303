@@ -177,7 +177,7 @@ impl<U: UintMont> EllipticCurve<U> {
     pub fn from_x<'a>(&'a self, x: ModRingElementRef<'a, U>) -> Option<EllipticCurvePoint<'a, U>> {
         assert_eq!(x.ring(), &self.base_field);
         let y2 = x.pow(3) + self.a() * x + self.b();
-        let y = y2.sqrt()?;
+        let y = y2.square();
         Some(EllipticCurvePoint {
             curve:       self,
             coordinates: Coordinates::Affine(x, y),
@@ -197,7 +197,7 @@ impl<U: UintMont> EllipticCurve<U> {
         }
     }
 
-    fn ensure_valid<'a>(
+    pub fn ensure_valid<'a>(
         &'a self,
         x: ModRingElementRef<'a, U>,
         y: ModRingElementRef<'a, U>,

@@ -7,7 +7,7 @@ use {
 
 const PROXMARK3_VENDOR_ID: u16 = 0x9ac4;
 const PROXMARK3_PRODUCT_ID: u16 = 0x4b8f;
-const TIMEOUT: Duration = Duration::from_secs(3);
+const TIMEOUT: Duration = Duration::from_secs(20);
 
 pub struct UsbConnection {
     handle:            DeviceHandle<GlobalContext>,

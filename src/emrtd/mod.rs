@@ -1,6 +1,7 @@
 //! Library for interacting with an ICAO 9303 compliant eMRTD.
 
 mod bac;
+mod chip_access;
 mod chip_authentication;
 mod commands;
 mod files;
@@ -117,6 +118,7 @@ impl Emrtd {
         // TODO: Apply command chaining and `GET RESPONSE` handling.
         // This goes after enctyption (`GET RESPONSE` is always plaintext).
 
+        println!("sending apdu: {}", hex::encode(apdu));
         let (status, data) = self
             .nfc
             .send_apdu(&protected_apdu)
