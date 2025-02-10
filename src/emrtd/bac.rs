@@ -1,9 +1,6 @@
 use {
-    super::{
-        pad,
-        secure_messaging::{tdes::TDesCipher, Cipher, Encrypted},
-        seed_from_mrz, Emrtd,
-    },
+    super::{pad, secure_messaging::Encrypted, seed_from_mrz, Emrtd},
+    crate::crypto::cipher::{tdes::TDesCipher, Cipher, SMCipher},
     anyhow::{anyhow, ensure, Result},
     rand::Rng,
     std::array,
@@ -42,7 +39,7 @@ impl Emrtd {
 
         // Compute encryption / authentication keys from MRZ
         let seed = seed_from_mrz(mrz);
-        let cipher = TDesCipher::from_seed(&seed);
+        let cipher = TDesCipher::from_seed(&seed)?;
 
         // GET CHALLENGE
         let rnd_ic = self.get_challenge()?;
@@ -52,10 +49,10 @@ impl Emrtd {
         msg.extend_from_slice(&rnd_ifd);
         msg.extend_from_slice(&rnd_ic);
         msg.extend_from_slice(&k_ifd);
-        cipher.enc(0, &mut msg);
+        cipher.sm_enc(0, &mut msg)?;
         let mut msg_mac = msg.clone();
         pad(&mut msg_mac, cipher.block_size());
-        msg.extend(cipher.mac(0, &msg_mac));
+        msg.extend(cipher.mac(&msg_mac)?);
 
         // EXTERNAL AUTHENTICATE
         let mut resp_data = self.external_authenticate(&msg)?;
@@ -64,9 +61,9 @@ impl Emrtd {
         // Check MAC and decrypt response
         let mut msg_mac = resp_data[..32].to_vec();
         pad(&mut msg_mac, cipher.block_size());
-        let mac = cipher.mac(0, &msg_mac);
+        let mac = cipher.mac(&msg_mac)?;
         ensure!(&resp_data[32..] == &mac[..]);
-        cipher.dec(0, &mut resp_data[..32]);
+        cipher.sm_dec(0, &mut resp_data[..32])?;
         let resp_data = &resp_data[..32];
 
         // Check nonce consistency
@@ -85,7 +82,7 @@ impl Emrtd {
         let ssc: u64 = u64::from_be_bytes(ssc_bytes[..8].try_into().unwrap());
 
         // Add TDES session keys to secure messaging
-        let tdes = Encrypted::new(TDesCipher::from_seed(&seed), ssc);
+        let tdes = Encrypted::new(TDesCipher::from_seed(&seed)?, ssc);
         self.secure_messaging = Box::new(tdes);
 
         Ok(())

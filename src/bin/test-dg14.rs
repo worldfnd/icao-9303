@@ -57,7 +57,7 @@ fn main() -> Result<()> {
                 .cipher
                 .ok_or_else(|| anyhow!("No symmetric cipher"))?;
             for i in 0..3 {
-                let mut sm = construct_secure_messaging(cipher, &shared_secret, 2 * i);
+                let mut sm = construct_secure_messaging(cipher, &shared_secret, 2 * i)?;
                 let msg = sm.enc_apdu(SELECT_MASTER_FILE)?;
                 println!("   - Challenge {}: {}", i, hex::encode(msg));
             }
