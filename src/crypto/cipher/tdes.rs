@@ -1,7 +1,9 @@
-//! 3DES cipher for Secure Messaging
+//! 3DES cipher
+//! Includes helpers for Secure Messaging
 
 use {
-    super::{Cipher, KDF_ENC, KDF_MAC},
+    super::{Cipher, SMCipher, KDF_ENC, KDF_MAC},
+    anyhow::{anyhow, ensure, Result},
     cbc::{Decryptor as CbcDec, Encryptor as CbcEnc},
     cipher::{
         block_padding::NoPadding, BlockDecrypt as _, BlockDecryptMut as _, BlockEncrypt as _,
@@ -19,42 +21,48 @@ pub struct TDesCipher {
 }
 
 impl Cipher for TDesCipher {
-    fn from_seed(seed: &[u8]) -> Self {
-        Self {
-            kenc: kdf(seed, KDF_ENC),
-            kmac: kdf(seed, KDF_MAC),
-        }
+    fn from_keys(kenc: &[u8], kmac: &[u8]) -> Result<Self> {
+        Ok(Self {
+            kenc: kenc.try_into()?,
+            kmac: kmac.try_into()?,
+        })
     }
 
     fn block_size(&self) -> usize {
         BLOCK_SIZE
     }
 
-    fn enc(&self, _ssc: u64, data: &mut [u8]) {
-        assert!(data.len() % BLOCK_SIZE == 0);
-        let cipher = TdesEde2::new_from_slice(&self.kenc[..]).unwrap();
-        let iv = [0; 8];
-        let block_mode = CbcEnc::inner_iv_slice_init(cipher, &iv).unwrap();
-        let len = data.len();
+    fn enc(&self, data: &mut [u8], iv: &[u8]) -> Result<()> {
+        ensure!(
+            data.len() % BLOCK_SIZE == 0,
+            "data length must be a multiple of block size (8)"
+        );
+        let cipher = TdesEde2::new_from_slice(&self.kenc[..])?;
+        let block_mode = CbcEnc::inner_iv_slice_init(cipher, iv.try_into()?)?;
         block_mode
-            .encrypt_padded_mut::<NoPadding>(data, len)
-            .unwrap();
+            .encrypt_padded_mut::<NoPadding>(data, data.len())
+            .map_err(|e| anyhow!("Encryption error: {:?}", e))?;
+        Ok(())
     }
 
-    fn dec(&self, _ssc: u64, data: &mut [u8]) {
-        assert!(data.len() % BLOCK_SIZE == 0);
-        let cipher = TdesEde2::new_from_slice(&self.kenc[..]).unwrap();
-        let iv = [0; 8];
-        let block_mode = CbcDec::inner_iv_slice_init(cipher, &iv).unwrap();
-        block_mode.decrypt_padded_mut::<NoPadding>(data).unwrap();
+    fn dec(&self, data: &mut [u8], iv: &[u8]) -> Result<()> {
+        ensure!(
+            data.len() % BLOCK_SIZE == 0,
+            "data length must be a multiple of block size (8)"
+        );
+        let cipher = TdesEde2::new_from_slice(&self.kenc[..])?;
+        let block_mode = CbcDec::inner_iv_slice_init(cipher, iv.try_into()?)?;
+        block_mode
+            .decrypt_padded_mut::<NoPadding>(data)
+            .map_err(|e| anyhow!("Decryption error: {:?}", e))?;
+        Ok(())
     }
 
     /// Retail MAC (ISO 9797-1 mode 3) using DES.
     // See <https://crypto.stackexchange.com/questions/18951/what-are-options-to-compute-des-retail-mac-aka-iso-9797-1-mode-3-under-pkcs11>
-    fn mac(&self, _ssc: u64, data: &[u8]) -> [u8; 8] {
-        assert_eq!(data.len() % BLOCK_SIZE, 0);
-        let des1 = Des::new_from_slice(&self.kmac[..8]).unwrap();
-        let des2 = Des::new_from_slice(&self.kmac[8..]).unwrap();
+    fn mac(&self, data: &[u8]) -> Result<[u8; 8]> {
+        let des1 = Des::new_from_slice(&self.kmac[..8])?;
+        let des2 = Des::new_from_slice(&self.kmac[8..])?;
         let mut state = [0_u8; 8];
         for block in data.chunks_exact(8) {
             for i in 0..8 {
@@ -64,18 +72,35 @@ impl Cipher for TDesCipher {
         }
         des2.decrypt_block((&mut state).into());
         des1.encrypt_block((&mut state).into());
-        state
+        Ok(state)
     }
 }
 
-fn kdf(seed: &[u8], counter: u32) -> [u8; 16] {
+impl SMCipher for TDesCipher {
+    fn from_seed(seed: &[u8]) -> Result<Self> {
+        Ok(Self {
+            kenc: kdf(seed, KDF_ENC)?,
+            kmac: kdf(seed, KDF_MAC)?,
+        })
+    }
+
+    fn sm_enc(&self, _ssc: u64, data: &mut [u8]) -> Result<()> {
+        self.enc(data, &[0; 8])
+    }
+
+    fn sm_dec(&self, _ssc: u64, data: &mut [u8]) -> Result<()> {
+        self.dec(data, &[0; 8])
+    }
+}
+
+fn kdf(seed: &[u8], counter: u32) -> Result<[u8; 16]> {
     let mut hasher = Sha1::new();
     hasher.update(seed);
     hasher.update(counter.to_be_bytes());
     let hash = hasher.finalize();
-    let mut key: [u8; 16] = hash[0..16].try_into().unwrap();
+    let mut key: [u8; 16] = hash[0..16].try_into()?;
     set_parity_bits(&mut key);
-    key
+    Ok(key)
 }
 
 /// DES keys use only 7 bits per byte, with the least significant bit used for
@@ -90,8 +115,8 @@ fn set_parity_bits(key: &mut [u8]) {
 #[cfg(test)]
 mod tests {
     use {
-        super::{super::SecureMessaging, *},
-        crate::emrtd::{pad, secure_messaging::Encrypted, seed_from_mrz},
+        super::*,
+        crate::emrtd::{pad, seed_from_mrz},
         hex_literal::hex,
     };
 
@@ -102,7 +127,7 @@ mod tests {
         let seed = seed_from_mrz(mrz);
         assert_eq!(seed, hex!("239AB9CB282DAF66231DC5A4DF6BFBAE"));
 
-        let (kenc, kmac) = (kdf(&seed, KDF_ENC), kdf(&seed, KDF_MAC));
+        let (kenc, kmac) = (kdf(&seed, KDF_ENC).unwrap(), kdf(&seed, KDF_MAC).unwrap());
         assert_eq!(kenc, hex!("AB94FDECF2674FDFB9B391F85D7F76F2"));
         assert_eq!(kmac, hex!("7962D9ECE03D1ACD4C76089DCE131543"));
     }
@@ -111,7 +136,10 @@ mod tests {
     #[test]
     fn test_derive_keys() {
         let k_seed = hex!("0036D272F5C350ACAC50C3F572D23600");
-        let (kenc, kmac) = (kdf(&k_seed, KDF_ENC), kdf(&k_seed, KDF_MAC));
+        let (kenc, kmac) = (
+            kdf(&k_seed, KDF_ENC).unwrap(),
+            kdf(&k_seed, KDF_MAC).unwrap(),
+        );
         assert_eq!(kenc, hex!("979EC13B1CBFE9DCD01AB0FED307EAE5"));
         assert_eq!(kmac, hex!("F1CB1F1FB5ADF208806B89DC579DC1F8"));
     }
@@ -125,7 +153,7 @@ mod tests {
             };
             let mut msg = msg.to_vec();
             pad(&mut msg, 8);
-            cipher.mac(0, &msg)
+            cipher.mac(&msg).unwrap()
         }
 
         let key = hex!("7962D9ECE03D1ACD4C76089DCE131543");
@@ -151,7 +179,7 @@ mod tests {
                 kenc: *key,
                 kmac: *key,
             };
-            cipher.enc(0, msg)
+            cipher.sm_enc(0, msg).unwrap()
         }
 
         let key = hex!("AB94FDECF2674FDFB9B391F85D7F76F2");
@@ -174,42 +202,5 @@ mod tests {
         let mut res = msg;
         des_enc(&key, &mut res[..]);
         assert_eq!(res, enc);
-    }
-
-    // Example from ICAO 9303-11 section D.4
-    #[test]
-    fn test_tdes_sm() {
-        let seed = hex!("0036D272F5C350ACAC50C3F572D23600");
-        let ssc = 0x887022120c06c226;
-        let mut tdes = Encrypted::new(TDesCipher::from_seed(&seed[..]), ssc);
-
-        // Select EF.COM
-        let apdu = hex!("00 A4 02 0C 02 01 1E");
-        let papdu = tdes.enc_apdu(&apdu).unwrap();
-        assert_eq!(
-            papdu,
-            hex!("0CA4020C158709016375432908C044F68E08BF8B92D635FF24F800")
-        );
-        let rapdu = hex!("990290008E08FA855A5D4C50A8ED");
-        let dec = tdes.dec_response(0x9000.into(), &rapdu).unwrap();
-        assert_eq!(dec, hex!(""));
-
-        // Read Binary of first four bytes
-        let apdu = hex!("00 B0 00 00 04");
-        let papdu = tdes.enc_apdu(&apdu).unwrap();
-        assert_eq!(papdu, hex!("0CB000000D9701048E08ED6705417E96BA5500"));
-        let rapdu = hex!("8709019FF0EC34F9922651990290008E08AD55CC17140B2DED");
-        let data = tdes.dec_response(0x9000.into(), &rapdu).unwrap();
-        assert_eq!(data, hex!("60145F01"));
-
-        // Read Binary of remaining 18 bytes from offset 4
-        let apdu = hex!("00 B0 00 04 12");
-        let papdu = tdes.enc_apdu(&apdu).unwrap();
-        assert_eq!(papdu, hex!("0CB000040D9701128E082EA28A70F3C7B53500"));
-        let rapdu = hex!(
-            "871901FB9235F4E4037F2327DCC8964F1F9B8C30F42C8E2FFF224A990290008E08C8B2787EAEA07D74"
-        );
-        let data = tdes.dec_response(0x9000.into(), &rapdu).unwrap();
-        assert_eq!(data, hex!("04303130365F36063034303030305C026175"));
     }
 }

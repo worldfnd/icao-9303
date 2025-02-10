@@ -46,7 +46,7 @@ impl Emrtd {
 
         // Keys should now have been changed.
         let cipher = SymmetricCipher::Aes256;
-        self.set_secure_messaging(construct_secure_messaging(cipher, &shared_secret, 0));
+        self.set_secure_messaging(construct_secure_messaging(cipher, &shared_secret, 0)?);
 
         Ok(())
     }
