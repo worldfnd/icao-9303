@@ -44,7 +44,7 @@ impl Emrtd {
         let data = self
             .commands()
             .general_authenticate(&[(0x80, public_key.as_ref())], true)?;
-        println!("==> General Authenticate: {}", hex::encode(data));
+        println!("==> General Authenticate OK");
 
         // Keys should now have been changed.
         let cipher = SymmetricCipher::Aes256;

@@ -1,6 +1,7 @@
 use {
     super::{iso7816::Apdu, Emrtd},
     anyhow::{ensure, Result},
+    bytes::Buf,
 };
 
 pub struct Commands<'a> {
@@ -64,7 +65,11 @@ impl<'a> Commands<'a> {
 
     /// Send GENERAL AUTHENTICATE command. Uses command chaining.
     /// Set `last` to false if more APDUs to be sent.
-    pub fn general_authenticate(&mut self, data: &[(u8, &[u8])], last: bool) -> Result<Vec<u8>> {
+    pub fn general_authenticate(
+        &mut self,
+        data: &[(u8, &[u8])],
+        last: bool,
+    ) -> Result<Vec<(u8, Vec<u8>)>> {
         let mut apdu = Apdu::new(0x00, 0x86, 0x00, 0x00, None);
         apdu.dynamic_auth();
         if !last {
@@ -77,6 +82,37 @@ impl<'a> Commands<'a> {
         let (status, data) = self.card.send_apdu(&apdu.build()?)?;
         ensure!(status.is_success(), "Failed to authenticate: {}", status);
 
-        Ok(data)
+        let mut buf = &data[..];
+        ensure!(buf.has_remaining(), "Empty response");
+        ensure!(
+            buf.get_u8() == 0x7c,
+            "Invalid Dynamic Authentication response tag"
+        );
+
+        let outer_len = buf.get_u8();
+
+        // Check if we have an empty response (just 0x7C 00)
+        if outer_len == 0 {
+            return Ok(Vec::new());
+        }
+
+        ensure!(
+            buf.remaining() >= outer_len as usize,
+            "Invalid outer length"
+        );
+
+        let mut result = Vec::new();
+        while buf.has_remaining() {
+            ensure!(buf.remaining() >= 2, "Truncated TLV");
+            let tag = buf.get_u8();
+            let len = buf.get_u8();
+
+            ensure!(buf.remaining() >= len as usize, "Invalid TLV length");
+            let value = buf.copy_to_bytes(len as usize).to_vec();
+
+            result.push((tag, value));
+        }
+
+        Ok(result)
     }
 }
