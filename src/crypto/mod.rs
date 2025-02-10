@@ -2,8 +2,8 @@
 //!
 //! Primarily based on TR-03111.
 
-pub mod cipher;
 pub mod certificate;
+pub mod cipher;
 mod codec;
 mod dh;
 pub mod ecdsa;

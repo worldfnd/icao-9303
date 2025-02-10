@@ -62,7 +62,7 @@ fn main() -> Result<()> {
 
     // Do Chip Authentication
     card.chip_authenticate(&mut rng)
-       .context("Error during Chip Authentication.")?;
+        .context("Error during Chip Authentication.")?;
 
     Ok(())
 }

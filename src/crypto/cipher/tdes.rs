@@ -21,33 +21,17 @@ pub struct TDesCipher {
 }
 
 impl Cipher for TDesCipher {
-<<<<<<< HEAD:src/crypto/cipher/tdes.rs
     fn from_keys(kenc: &[u8], kmac: &[u8]) -> Result<Self> {
         Ok(Self {
             kenc: kenc.try_into()?,
             kmac: kmac.try_into()?,
         })
-=======
-    fn from_key(kenc: &[u8], kmac: &[u8]) -> Self {
-        Self {
-            kenc: kenc.try_into().unwrap(),
-            kmac: kmac.try_into().unwrap(),
-        }
-    }
-
-    fn from_seed(seed: &[u8]) -> Self {
-        Self {
-            kenc: kdf(seed, KDF_ENC),
-            kmac: kdf(seed, KDF_MAC),
-        }
->>>>>>> fe74fb8 (PACE draft (only ECDH GM Brainpool256 AES128)):src/emrtd/secure_messaging/tdes.rs
     }
 
     fn block_size(&self) -> usize {
         BLOCK_SIZE
     }
 
-<<<<<<< HEAD:src/crypto/cipher/tdes.rs
     fn enc(&self, data: &mut [u8], iv: &[u8]) -> Result<()> {
         ensure!(
             data.len() % BLOCK_SIZE == 0,
@@ -55,30 +39,12 @@ impl Cipher for TDesCipher {
         );
         let cipher = TdesEde2::new_from_slice(&self.kenc[..])?;
         let block_mode = CbcEnc::inner_iv_slice_init(cipher, iv.try_into()?)?;
-=======
-    fn enc_with_iv(&self, data: &mut [u8], iv: &[u8]) {
-        assert!(data.len() % BLOCK_SIZE == 0);
-        let cipher = TdesEde2::new_from_slice(&self.kenc[..]).unwrap();
-        let block_mode = CbcEnc::inner_iv_slice_init(cipher, iv.try_into().unwrap()).unwrap();
-        block_mode
-            .encrypt_padded_mut::<NoPadding>(data, data.len())
-            .unwrap();
-    }
-
-    fn enc(&self, _ssc: u64, data: &mut [u8]) {
-        assert!(data.len() % BLOCK_SIZE == 0);
-        let cipher = TdesEde2::new_from_slice(&self.kenc[..]).unwrap();
-        let iv = [0; 8];
-        let block_mode = CbcEnc::inner_iv_slice_init(cipher, &iv).unwrap();
-        let len = data.len();
->>>>>>> fe74fb8 (PACE draft (only ECDH GM Brainpool256 AES128)):src/emrtd/secure_messaging/tdes.rs
         block_mode
             .encrypt_padded_mut::<NoPadding>(data, data.len())
             .map_err(|e| anyhow!("Encryption error: {:?}", e))?;
         Ok(())
     }
 
-<<<<<<< HEAD:src/crypto/cipher/tdes.rs
     fn dec(&self, data: &mut [u8], iv: &[u8]) -> Result<()> {
         ensure!(
             data.len() % BLOCK_SIZE == 0,
@@ -90,21 +56,6 @@ impl Cipher for TDesCipher {
             .decrypt_padded_mut::<NoPadding>(data)
             .map_err(|e| anyhow!("Decryption error: {:?}", e))?;
         Ok(())
-=======
-    fn dec_with_iv(&self, data: &mut [u8], iv: &[u8]) {
-        assert!(data.len() % BLOCK_SIZE == 0);
-        let cipher = TdesEde2::new_from_slice(&self.kenc[..]).unwrap();
-        let block_mode = CbcDec::inner_iv_slice_init(cipher, iv.try_into().unwrap()).unwrap();
-        block_mode.decrypt_padded_mut::<NoPadding>(data).unwrap();
-    }
-
-    fn dec(&self, _ssc: u64, data: &mut [u8]) {
-        assert!(data.len() % BLOCK_SIZE == 0);
-        let cipher = TdesEde2::new_from_slice(&self.kenc[..]).unwrap();
-        let iv = [0; 8];
-        let block_mode = CbcDec::inner_iv_slice_init(cipher, &iv).unwrap();
-        block_mode.decrypt_padded_mut::<NoPadding>(data).unwrap();
->>>>>>> fe74fb8 (PACE draft (only ECDH GM Brainpool256 AES128)):src/emrtd/secure_messaging/tdes.rs
     }
 
     /// Retail MAC (ISO 9797-1 mode 3) using DES.

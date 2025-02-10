@@ -50,7 +50,7 @@ impl Emrtd {
         }
 
         // Select parent file if necessary.
-         if self.parent != file.parent() {
+        if self.parent != file.parent() {
             if let Some(application_id) = file.parent().aid() {
                 self.select_dedicated_file(application_id)?;
             } else {
