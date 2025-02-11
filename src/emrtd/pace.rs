@@ -5,11 +5,13 @@ use {
         crypto::{
             cipher::{aes::*, tdes::*, Cipher, SMCipher},
             groups::ModPGroup,
+            mod_ring::UintExp,
             CryptoCoreRng,
         },
     },
     anyhow::{anyhow, bail, ensure, Result},
     der::{asn1::ObjectIdentifier as Oid, Encode, Length},
+    num_traits::Inv,
     sha1::{Digest, Sha1},
 };
 
@@ -67,7 +69,19 @@ impl Emrtd {
             PaceKeyMapping::Gm | PaceKeyMapping::Cam => {
                 generic_mapping(&map_privk, &map_card_pubkey, &nonce)?
             }
-            PaceKeyMapping::Im => todo!("INTEGRATED MAPPING"),
+            PaceKeyMapping::Im => {
+                // Request additional nonce
+                let mut im_nonce = vec![0x00; nonce.len()];
+                rng.fill_bytes(&mut im_nonce);
+                let (tag, _) = self
+                    .commands()
+                    .general_authenticate(&[], false)?
+                    .drain(..1)
+                    .next()
+                    .ok_or_else(|| anyhow!("Expected data in GA response"))?;
+                ensure!(tag == 0x82);
+                integrated_mapping(&map_card_pubkey, &nonce, &im_nonce)?
+            }
         };
 
         // c)
@@ -261,6 +275,219 @@ fn generic_mapping(
     }
 }
 
+use hex_literal::hex;
+const C0_LENGTH_128: [u8; 16] = hex!("a668892a7c41e3ca739f40b057d85904");
+const C1_LENGTH_128: [u8; 16] = hex!("a4e136ac725f738b01c1f60217c188ad");
+const C0_LENGTH_256: [u8; 32] =
+    hex!("d463d65234124ef7897054986dca0a174e28df758cbaa03f240616414d5a1676");
+const C1_LENGTH_256: [u8; 32] =
+    hex!("54bd7255f0aaf831bec3423fcf39d69b6cbf066677d0faae5aadd99df8e53517");
+
+fn pseudo_random(s: &[u8], t: &[u8], p: &U4096, cipher: SymmetricCipher) -> Result<Vec<u8>> {
+    if s.is_empty() || t.is_empty() {
+        bail!("Empty input");
+    }
+
+    let l = s.len() * 8; // length in bits
+    let k = t.len() * 8; // key size in bits
+
+    let (c0, c1) = match l {
+        128 => (&C0_LENGTH_128[..], &C1_LENGTH_128[..]),
+        192 | 256 => (&C0_LENGTH_256[..], &C1_LENGTH_256[..]),
+        _ => bail!("Unknown length {}, expected 128, 192, or 256", l),
+    };
+
+    // First encryption to get the key
+    let mut key = s.to_vec();
+    match cipher {
+        SymmetricCipher::Tdes => {
+            let cipher = TDesCipher::from_keys(t, &[0; 16])?;
+            cipher.enc(&mut key, &[0; 8])?
+        }
+        SymmetricCipher::Aes128 => {
+            let cipher = Aes128Cipher::from_keys(t, &[0; 16])?;
+            cipher.enc(&mut key, &[0; 16])?
+        }
+        SymmetricCipher::Aes192 => {
+            let cipher = Aes192Cipher::from_keys(t, &[0; 16])?;
+            cipher.enc(&mut key, &[0; 16])?
+        }
+        SymmetricCipher::Aes256 => {
+            let cipher = Aes256Cipher::from_keys(t, &[0; 16])?;
+            cipher.enc(&mut key, &[0; 16])?
+        }
+    };
+
+    let mut x = Vec::new();
+    let mut n = 0;
+
+    // Continue encrypting until we have enough bits
+    while n * l < p.significant_bits() as usize + 64 {
+        let key_n = match cipher {
+            SymmetricCipher::Tdes => {
+                let cipher = TDesCipher::from_keys(&key[..k / 8], &[0; 16])?;
+                let mut k = c0.to_vec();
+                cipher.enc(&mut k, &[0; 8])?;
+                let mut x_n = c1.to_vec();
+                cipher.enc(&mut x_n, &[0; 8])?;
+                x.extend_from_slice(&x_n);
+                k
+            }
+            SymmetricCipher::Aes128 => {
+                let cipher = Aes128Cipher::from_keys(&key[..k / 8], &[0; 16])?;
+                let mut k = c0.to_vec();
+                cipher.enc(&mut k, &[0; 16])?;
+                let mut x_n = c1.to_vec();
+                cipher.enc(&mut x_n, &[0; 16])?;
+                x.extend_from_slice(&x_n);
+                k
+            }
+            SymmetricCipher::Aes192 => {
+                let cipher = Aes192Cipher::from_keys(&key[..k / 8], &[0; 16])?;
+                let mut k = c0.to_vec();
+                cipher.enc(&mut k, &[0; 16])?;
+                let mut x_n = c1.to_vec();
+                cipher.enc(&mut x_n, &[0; 16])?;
+                x.extend_from_slice(&x_n);
+                k
+            }
+            SymmetricCipher::Aes256 => {
+                let cipher = Aes256Cipher::from_keys(&key[..k / 8], &[0; 16])?;
+                let mut k = c0.to_vec();
+                cipher.enc(&mut k, &[0; 16])?;
+                let mut x_n = c1.to_vec();
+                cipher.enc(&mut x_n, &[0; 16])?;
+                x.extend_from_slice(&x_n);
+                k
+            }
+        };
+        key = key_n;
+        n += 1;
+    }
+
+    let x_int = U4096::from_be_slice(&x);
+    let result = x_int % p;
+
+    use crate::crypto::{BsiTr031111Codec, Codec};
+    let mut buf = Vec::new();
+    let mut codec = BsiTr031111Codec::default();
+    codec.uint_bytes = Some((p.significant_bits() + 7) / 8);
+    codec.encode(&mut buf, result);
+    Ok(buf)
+}
+
+fn integrated_mapping(
+    pubk: &PublicKey,
+    nonce: &[u8],
+    im_nonce: &[u8],
+) -> Result<Box<dyn KeyAgreementAlgorithm>> {
+    match pubk {
+        PublicKey::DH(pubk) => {
+            let rp = pseudo_random(
+                nonce,
+                im_nonce,
+                &U4096::from_be_slice(&pubk.group.base_field().modulus().to_be_bytes_vec()),
+                SymmetricCipher::Aes128,
+            )?;
+            let g_hat = im_fg_dh(&rp, &pubk.group)?;
+
+            let mapped_group = ModPGroup::new(
+                pubk.group.base_field().modulus(),
+                g_hat,
+                pubk.group.scalar_field().modulus(),
+            )?;
+
+            Ok(Box::new(mapped_group))
+        }
+        PublicKey::EC(pubk) => {
+            let rp = pseudo_random(
+                nonce,
+                im_nonce,
+                &U4096::from_be_slice(&pubk.curve.base_field().modulus().to_be_bytes_vec()),
+                SymmetricCipher::Aes128,
+            )?;
+            let (x, y) = im_fg_ecdh(&rp, &pubk.curve)?;
+
+            let mapped_curve = EllipticCurve::new(
+                pubk.curve.base_field().modulus(),
+                pubk.curve.a().to_uint(),
+                pubk.curve.b().to_uint(),
+                x,
+                y,
+                pubk.curve.scalar_field().modulus(),
+                pubk.curve.cofactor(),
+            )?;
+            Ok(Box::new(mapped_curve))
+        }
+        _ => bail!("unhandled key type"),
+    }
+}
+
+fn im_fg_ecdh(t: &[u8], curve: &EllipticCurve<U521>) -> Result<(U521, U521)> {
+    let p = curve.base_field().modulus();
+
+    // Check if p ≡ 3 (mod 4)
+    ensure!((p % U521::from(4)) == U521::from(3), "p != 3 (mod 4)");
+
+    let t = U521::from_be_slice(t);
+    let a = curve.a();
+    let b = curve.b();
+    let f = curve.cofactor();
+
+    // 1. α = - t^2 mod p
+    let alpha = -curve.base_field().from(t).pow_ct(U521::from(2));
+
+    // 2. X_2 = -b a^-1 (1+(α+α^2)^-1) mod p, TODO consider Note
+    let alpha_p_alpha2 = alpha + alpha.pow_ct(U521::from(2));
+    let inner = alpha_p_alpha2.inv().unwrap() + curve.base_field().from(U521::from(1));
+    let x_2 = -b * a.inv().unwrap() * inner;
+
+    // 3. X_3 = αX_2 mod p
+    let x_3 = alpha * x_2;
+
+    // 4. h_2 = X_2^3 + aX_2 + b mod p
+    let h_2 = x_2.pow_ct(U521::from(3)) + a * x_2 + b;
+
+    // 5. h_3 not needed
+
+    // 6. U = t^3 h_2 mod p
+    let u = curve.base_field().from(t).pow_ct(U521::from(3)) * h_2;
+
+    // 7. A = h_2^(p-1-(p+1)/4) mod p
+    let power = p - U521::from(1) - (p + U521::from(1)) / U521::from(4);
+    let a = h_2.pow_ct(power);
+
+    // 8., 9. If A^2 h_2 = 1 mod p, use (X_2, A h_2), else use (X_3, AU)
+    let (x, y) = if a.pow_ct(U521::from(2)) * h_2 == curve.base_field().from(U521::from(1)) {
+        (x_2, a * h_2)
+    } else {
+        (x_3, a * u)
+    };
+
+    // 10. Multiply by cofactor if needed
+    if f != U521::from(1) {
+        let point = curve.from_affine(x, y)?;
+        let scaled_point = point * curve.scalar_field().from(f);
+        let (scaled_x, scaled_y) = scaled_point
+            .coordinates()
+            .ok_or_else(|| anyhow!("Invalid point after cofactor multiplication"))?;
+        Ok((scaled_x.to_uint(), scaled_y.to_uint()))
+    } else {
+        Ok((x.to_uint(), y.to_uint()))
+    }
+}
+
+fn im_fg_dh(x: &[u8], group: &ModPGroup<U4096, U4096>) -> Result<U4096> {
+    let a = (group.base_field().modulus() - U4096::from(1)) / group.scalar_field().modulus();
+    let y = group
+        .base_field()
+        .from(U4096::from_be_slice(x))
+        .pow_ct(a)
+        .to_uint();
+    ensure!(y != U4096::from(1));
+    Ok(y)
+}
+
 #[cfg(test)]
 mod tests {
     use {
@@ -305,7 +532,7 @@ mod tests {
         // Generic mapping
         let map_i_privk = hex!(
             "7F4EF07B 9EA82FD7 8AD689B3 8D0BC78C
-                                F21F249D 953BC46F 4C6E1925 9C010F99"
+             F21F249D 953BC46F 4C6E1925 9C010F99"
         );
         let map_i_pubk = hex!(
             "04
@@ -384,7 +611,7 @@ mod tests {
         // Check shared secret K
         let i_privk = hex!(
             "A73FB703 AC1436A1 8E0CFA5A BB3F7BEC
-                                      7A070E7A 6788486B EE230C4A 22762595"
+             7A070E7A 6788486B EE230C4A 22762595"
         );
         let i_pubk = (
             hex!("2DB7A64C 0355044E C9DF1905 14C625CB A2CEA487 54887122 F3A5EF0D 5EDD301C"),
@@ -586,5 +813,136 @@ mod tests {
         // check token (inspection)
         let computed_token = compute_auth_token(&k, &eph_c_pubk, &pace_info).unwrap();
         assert_eq!(computed_token, hex!("B46DD9BD 4D98381F"));
+    }
+
+    #[test]
+    fn test_pace_example_h1() {
+        let pace_info =
+            PaceInfo::from_der(&hex!("3012060A 04007F00 07020204 04020201 0202010D")).unwrap();
+        let map_kaa = pace_info.kaa().unwrap();
+
+        // check nonce
+        let k_pi = hex!("591468CD A83D6521 9CCCB856 0233600F");
+        let mut nonce = hex!("143DC40C 08C8E891 FBED7DED B92B64AD");
+        let cipher = Aes128Cipher::from_keys(&k_pi, &[0; 16]).unwrap();
+        cipher.dec(&mut nonce, &[0; 16]).unwrap();
+        assert_eq!(nonce, hex!("2923BE84 E16CD6AE 529049F1 F1BBE9EB"));
+
+        let t = hex!("5DD4CBFC 96F5453B 130D890A 1CDBAE32");
+
+        // check pseudo random function
+        let curve = crate::crypto::groups::named::brainpool_p256r1_l();
+        let rp = hex!(
+            "A2F8FF2D F50E52C6 599F386A DCB595D2
+             29F6A167 ADE2BE5F 2C3296AD D5B7430E"
+        );
+
+        let rp_computed = pseudo_random(
+            &nonce,
+            &t,
+            &U4096::from_be_slice(&curve.base_field().modulus().to_be_bytes_vec()),
+            SymmetricCipher::Aes128,
+        )
+        .unwrap();
+        assert_eq!(rp_computed, rp);
+
+        // check g_hat
+        let g_hat = (
+            hex!("8E82D315 59ED0FDE 92A4D049 8ADD3C23 BABA94FB 77691E31 E90AEA77 FB17D427"),
+            hex!("4C1AE14B D0C3DBAC 0C871B7F 36081693 64437CA3 0AC243A0 89D3F266 C1E60FAD"),
+        );
+
+        let (x, y) = im_fg_ecdh(&rp, &curve).unwrap();
+        let x_bytes = x.to_be_bytes_vec();
+        let y_bytes = y.to_be_bytes_vec();
+        assert_eq!(&x_bytes[x_bytes.len() - 32..], &g_hat.0);
+        assert_eq!(&y_bytes[y_bytes.len() - 32..], &g_hat.1);
+
+        let eph_i_privk = hex!(
+            "A73FB703 AC1436A1 8E0CFA5A BB3F7BEC
+             7A070E7A 6788486B EE230C4A 22762595"
+        );
+        let eph_c_pubk = hex!(
+            "04
+             67F78E5F 7F768608 2B293E8D 087E0569
+             16D0F74B C01A5F89 57D0DE45 691E51E8
+             932B69A9 62B52A09 85AD2C0A 271EE6A1
+             3A8ADDDC D1A3A994 B9DED257 F4D22753"
+        );
+        let k = hex!(
+            "4F150FDE 1D4F0E38 E95017B8 91BAE171
+             33A0DF45 B0D3E18B 60BA7BEA FDC2C713"
+        );
+
+        let private = curve
+            .scalar_field()
+            .from(U521::from_be_slice(&eph_i_privk))
+            .as_montgomery();
+        let pubkey = map_kaa.parse_public_key(&eph_c_pubk).unwrap();
+        let eph_kaa = integrated_mapping(&pubkey, &nonce, &t).unwrap();
+
+        let computed_k = eph_kaa
+            .key_agreement(&PrivateKey(Box::new(private)), &pubkey)
+            .unwrap();
+        assert_eq!(computed_k, k);
+
+        let computed_token = compute_auth_token(&k, &eph_c_pubk, &pace_info).unwrap();
+        assert_eq!(computed_token, hex!("450F02B8 6F6A0909"));
+    }
+
+    // DH 1060 IM
+    #[test]
+    fn test_pace_example_h2() {
+        let pace_info =
+            PaceInfo::from_der(&hex!("3012060A 04007F00 07020204 04020201 02020100")).unwrap();
+        let map_kaa = pace_info.kaa().unwrap();
+
+        // check nonce
+        let k_pi = hex!("591468CD A83D6521 9CCCB856 0233600F");
+        let mut nonce = hex!("9ABB8864 CA0FF155 1E620D1E F4E13510");
+        let cipher = Aes128Cipher::from_keys(&k_pi, &[0; 16]).unwrap();
+        cipher.dec(&mut nonce, &[0; 16]).unwrap();
+        assert_eq!(nonce, hex!("FA5B7E3E 49753A0D B9178B7B 9BD898C8"));
+
+        let t = hex!("B3A6DB3C 870C3E99 245E0D1C 06B747DE");
+
+        // check pseudo random function
+        let group = crate::crypto::groups::named::modp_160_l();
+        let rp = hex!(
+            "A0C7C50C 002061A5 1CC87D25 4EF38068
+             607417B6 EE1B3647 3CFB800D 2D2E5FA2
+             B6980F01 105D24FA B22ACD1B FA5C8A4C
+             093ECDFA FE6D7125 D42A843E 33860383
+             5CF19AFA FF75EFE2 1DC5F6AA 1F9AE46C
+             25087E73 68166FB0 8C1E4627 AFED7D93
+             570417B7 90FF7F74 7E57F432 B04E1236
+             819E0DFE F5B6E77C A4999925 328182D2"
+        );
+
+        let rp_computed = pseudo_random(
+            &nonce,
+            &t,
+            &U4096::from_be_slice(&group.base_field().modulus().to_be_bytes_vec()),
+            SymmetricCipher::Aes128,
+        )
+        .unwrap();
+        assert_eq!(rp_computed, rp);
+
+        // check g_hat
+        let g_hat = hex!(
+            "1D7D767F 11E333BC D6DBAEF4 0E799E7A
+             926B9697 3550656F F3C83072 6D118D61
+             C276CDCC 61D475CF 03A98E0C 0E79CAEB
+             A5BE2557 8BD4551D 0B109032 36F0B0F9
+             76852FA7 8EEA14EA 0ACA87D1 E91F688F
+             E0DFF897 BBE35A47 2621D343 564B262F
+             34223AE8 FC59B664 BFEDFA2B FE7516CA
+             5510A6BB B633D517 EC25D4E0 BBAA16C2"
+        );
+
+        let x = im_fg_dh(&rp, &group).unwrap();
+        let x_bytes = x.to_be_bytes_vec();
+        let from = U4096::BYTES - (x.significant_bits() + 7) / 8;
+        assert_eq!(x_bytes[from..], g_hat);
     }
 }
