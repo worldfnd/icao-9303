@@ -2,7 +2,7 @@ mod chip_authentication_info;
 mod pace_info;
 
 pub use {
-    self::pace_info::{PaceInfo, PaceProtocol, StandardizedDomainParameter},
+    self::pace_info::{PaceInfo, PaceKeyMapping, PaceProtocol, StandardizedDomainParameter},
     chip_authentication_info::{
         ChipAuthenticationInfo, ChipAuthenticationProtocol, ChipAuthenticationPublicKeyInfo,
     },

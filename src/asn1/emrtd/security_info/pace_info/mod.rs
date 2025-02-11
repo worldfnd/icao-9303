@@ -1,6 +1,6 @@
 mod pace_protocol;
 
-pub use pace_protocol::PaceProtocol;
+pub use pace_protocol::{KeyMapping as PaceKeyMapping, PaceProtocol};
 use {crate::asn1::AnyAlgorithmIdentifier, der::Sequence};
 
 /// See ICAO-9303-11 9.2.1

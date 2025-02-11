@@ -74,11 +74,9 @@ impl PaceInfo {
             .parameter_id
             .ok_or_else(|| anyhow!("PaceInfo does not have parameterId set"))?;
         match id.into() {
+            StandardizedDomainParameter::Modp1024_160 => Ok(Box::new(groups::named::modp_160_l())),
             StandardizedDomainParameter::EcBrainpoolp256r1 => {
                 Ok(Box::new(groups::named::brainpool_p256r1_l()))
-            }
-            StandardizedDomainParameter::EcBrainpoolp320r1 => {
-                Ok(Box::new(groups::named::brainpool_p320r1_l()))
             }
             _ => todo!("{id}"),
         }
