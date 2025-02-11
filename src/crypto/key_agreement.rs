@@ -17,6 +17,7 @@ type U521 = ruint::Uint<521, 9>;
 
 /// Object safe trait for key agreement algorithms
 pub trait KeyAgreementAlgorithm: Debug {
+    fn parse_public_key(&self, bytes: &[u8]) -> Result<PublicKey>;
     fn generate_key_pair(&self, rng: &mut dyn CryptoCoreRng) -> (PrivateKey, PublicKey);
     fn key_agreement(&self, private: &PrivateKey, public: &PublicKey) -> Result<Vec<u8>>;
 }
@@ -28,6 +29,16 @@ pub trait DiffieHellman {
 }
 
 impl KeyAgreementAlgorithm for ModPGroup<U4096, U4096> {
+    fn parse_public_key(&self, bytes: &[u8]) -> Result<PublicKey> {
+        let int: ModRingElementRef<_> =
+            BsiTr031111Codec::default().decode(&mut &bytes[..], self.base_field())?;
+        let dhkey = DHPublicKey {
+            group: self.clone(),
+            key:   int.to_uint(),
+        };
+        Ok(PublicKey::DH(dhkey))
+    }
+
     fn generate_key_pair(&self, rng: &mut dyn CryptoCoreRng) -> (PrivateKey, PublicKey) {
         let private = self.base_field().random(rng).to_uint();
         let public = self.generator().pow_ct(private);
@@ -58,6 +69,16 @@ impl KeyAgreementAlgorithm for ModPGroup<U4096, U4096> {
 }
 
 impl KeyAgreementAlgorithm for EllipticCurve<U521> {
+    fn parse_public_key(&self, bytes: &[u8]) -> Result<PublicKey> {
+        let point: EllipticCurvePoint<_> =
+            BsiTr031111Codec::default().decode(&mut &bytes[..], self)?;
+        let eckey = ECPublicKey {
+            curve: self.clone(),
+            point: (point.x().unwrap().to_uint(), point.y().unwrap().to_uint()),
+        };
+        Ok(PublicKey::EC(eckey))
+    }
+
     fn generate_key_pair(&self, rng: &mut dyn super::CryptoCoreRng) -> (PrivateKey, PublicKey) {
         let private = self.scalar_field().random(rng);
         let public = self.generator() * private;
