@@ -5,6 +5,7 @@ use {
         ecdsa::{ECPublicKey, ECSignature},
         mod_ring::RingRefExt,
         rsa::RSAPublicKey,
+        uint::*,
     },
     crate::asn1::{
         public_key_info::SubjectPublicKeyInfo, signature_algorithm_identifier::EcdsaSigValue,
@@ -12,16 +13,13 @@ use {
     },
     anyhow::{bail, Result},
     der::{Decode, Encode},
-    ruint::{aliases::*, Uint},
 };
-
-type U521 = Uint<521, 9>;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PublicKey {
-    DH(DHPublicKey<U4096, U4096>),
-    EC(ECPublicKey<U521>),
-    RSA(RSAPublicKey<U4096>),
+    DH(DHPublicKey<DhUint, DhsUint>),
+    EC(ECPublicKey<EcUint>),
+    RSA(RSAPublicKey<RsaUint>),
 }
 
 impl PublicKey {
@@ -38,11 +36,11 @@ impl PublicKey {
                 let r_elem = key
                     .curve
                     .scalar_field()
-                    .from(U521::from_be_slice(&r.as_bytes()));
+                    .from(EcUint::from_be_slice(&r.as_bytes()));
                 let s_elem = key
                     .curve
                     .scalar_field()
-                    .from(U521::from_be_slice(&s.as_bytes()));
+                    .from(EcUint::from_be_slice(&s.as_bytes()));
                 let ecsig = ECSignature {
                     r: r_elem,
                     s: s_elem,
@@ -51,7 +49,7 @@ impl PublicKey {
                 key.verify(message, &ecsig, signature_algorithm)
             }
             PublicKey::RSA(key) => {
-                let sigint = U4096::from_be_slice(&signature);
+                let sigint = RsaUint::from_be_slice(&signature);
                 let rsasig = key.ring.from(sigint);
 
                 key.verify(message, rsasig, signature_algorithm)

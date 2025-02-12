@@ -5,15 +5,13 @@ use {
         ecdsa::ECPublicKey,
         groups::{EllipticCurve, EllipticCurvePoint, ModPGroup},
         mod_ring::{ModRingElementRef, RingRefExt},
+        uint::*,
         Codec, CryptoCoreRng, PrivateKey, PublicKey,
     },
     anyhow::{anyhow, bail, ensure, Result},
     num_traits::Inv,
-    ruint::aliases::U4096,
     std::fmt::Debug,
 };
-
-type U521 = ruint::Uint<521, 9>;
 
 /// Object safe trait for key agreement algorithms
 pub trait KeyAgreementAlgorithm: Debug {
@@ -28,7 +26,7 @@ pub trait DiffieHellman {
     fn shared_secret(&self, private: &[u8], public: &[u8]) -> Result<Vec<u8>>;
 }
 
-impl KeyAgreementAlgorithm for ModPGroup<U4096, U4096> {
+impl KeyAgreementAlgorithm for ModPGroup<DhUint, DhsUint> {
     fn parse_public_key(&self, bytes: &[u8]) -> Result<PublicKey> {
         let int: ModRingElementRef<_> =
             BsiTr031111Codec::default().decode(&mut &bytes[..], self.base_field())?;
@@ -50,7 +48,7 @@ impl KeyAgreementAlgorithm for ModPGroup<U4096, U4096> {
     }
 
     fn key_agreement(&self, private: &PrivateKey, public: &PublicKey) -> Result<Vec<u8>> {
-        let private: &U4096 = private
+        let private: &DhUint = private
             .0
             .as_ref()
             .downcast_ref()
@@ -68,7 +66,7 @@ impl KeyAgreementAlgorithm for ModPGroup<U4096, U4096> {
     }
 }
 
-impl KeyAgreementAlgorithm for EllipticCurve<U521> {
+impl KeyAgreementAlgorithm for EllipticCurve<EcUint> {
     fn parse_public_key(&self, bytes: &[u8]) -> Result<PublicKey> {
         let point: EllipticCurvePoint<_> =
             BsiTr031111Codec::default().decode(&mut &bytes[..], self)?;
@@ -93,7 +91,7 @@ impl KeyAgreementAlgorithm for EllipticCurve<U521> {
             *private
                 .0
                 .as_ref()
-                .downcast_ref::<U521>()
+                .downcast_ref::<EcUint>()
                 .ok_or(anyhow!("Invalid private key"))?,
         );
         let public = if let PublicKey::EC(key) = public {
@@ -109,9 +107,9 @@ impl KeyAgreementAlgorithm for EllipticCurve<U521> {
 /// Elliptic Curve Key Agreement
 /// See TR-03111 section 4.3.1
 pub fn ecka<'a>(
-    private_key: ModRingElementRef<'a, U521>,
-    public_key: &'a ECPublicKey<U521>,
-) -> Result<(EllipticCurvePoint<'a, U521>, Vec<u8>)> {
+    private_key: ModRingElementRef<'a, EcUint>,
+    public_key: &'a ECPublicKey<EcUint>,
+) -> Result<(EllipticCurvePoint<'a, EcUint>, Vec<u8>)> {
     let curve = &public_key.curve;
     let point = public_key.point()?;
     ensure!(private_key.ring() == curve.scalar_field());
