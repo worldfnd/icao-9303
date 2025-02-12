@@ -2,7 +2,7 @@ use {
     super::{
         pad,
         secure_messaging::{tdes::TDesCipher, Cipher, Encrypted},
-        seed_from_mrz, Emrtd,
+        Emrtd, MrzInfo,
     },
     anyhow::{anyhow, ensure, Result},
     rand::Rng,
@@ -35,13 +35,13 @@ impl Emrtd {
         Ok(data)
     }
 
-    pub fn basic_access_control(&mut self, rng: &mut impl Rng, mrz: &str) -> Result<()> {
+    pub fn basic_access_control(&mut self, rng: &mut impl Rng, mrz: &MrzInfo) -> Result<()> {
         // Compute local randomness
         let rnd_ifd: [u8; 8] = rng.gen();
         let k_ifd: [u8; 16] = rng.gen();
 
         // Compute encryption / authentication keys from MRZ
-        let seed = seed_from_mrz(mrz);
+        let seed = mrz.seed();
         let cipher = TDesCipher::from_seed(&seed);
 
         // GET CHALLENGE
