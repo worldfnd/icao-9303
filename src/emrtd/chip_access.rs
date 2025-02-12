@@ -14,7 +14,7 @@ impl Emrtd {
         match file {
             Ok(access) => {
                 let info = access.pace_info()?;
-                self.pace(rng, &mrz, info)
+                self.pace(rng, &mrz, info).map(drop)
             }
             _ => self.basic_access_control(rng, &mrz),
         }

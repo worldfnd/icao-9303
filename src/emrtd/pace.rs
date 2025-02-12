@@ -1,7 +1,10 @@
 use {
     super::{secure_messaging::construct_secure_messaging, Emrtd},
     crate::{
-        asn1::emrtd::security_info::{KeyAgreement, PaceInfo, PaceKeyMapping, SymmetricCipher},
+        asn1::emrtd::{
+            security_info::{KeyAgreement, PaceInfo, PaceKeyMapping, SymmetricCipher},
+            EfDg14,
+        },
         crypto::{
             cipher::{aes::*, tdes::*, Cipher, SMCipher},
             groups::ModPGroup,
@@ -20,7 +23,18 @@ pub const KDF_PACE: u32 = 3;
 use crate::crypto::{groups::EllipticCurve, KeyAgreementAlgorithm, PrivateKey, PublicKey};
 
 impl Emrtd {
-    pub fn pace(&mut self, rng: &mut impl CryptoCoreRng, mrz: &str, info: &PaceInfo) -> Result<()> {
+    /// Perform PACE, establishing a secure messaging channel with the eMRTD.
+    /// Returns `true` if the chip was proven authentic (not copied), `false`
+    /// otherwise. In the latter case, performing Active or Chip
+    /// Authentication is recommended.
+    ///
+    /// See ICAO-9303 11 4.4.
+    pub fn pace(
+        &mut self,
+        rng: &mut impl CryptoCoreRng,
+        mrz: &str,
+        info: &PaceInfo,
+    ) -> Result<bool> {
         // Derive symmetric key K_pi
         let k = k_from_mrz(mrz);
         let _k_pi = kdf_128(&k[..], KDF_PACE)?;
@@ -39,7 +53,7 @@ impl Emrtd {
         let (tag, mut nonce) = self
             .commands()
             .general_authenticate(&[], false)?
-            .drain(..1)
+            .into_iter()
             .next()
             .ok_or_else(|| anyhow!("Expected data in GA response"))?;
         ensure!(tag == 0x80);
@@ -53,17 +67,17 @@ impl Emrtd {
         // a)
         let map_kaa = info.kaa()?;
         let (map_privk, map_pubk) = map_kaa.generate_key_pair(rng);
-        let (tag, map_card_pubkey) = self
+        let (tag, map_card_pubkey_ser) = self
             .commands()
             .general_authenticate(&[(0x81, &map_pubk.to_bytes())], false)?
-            .drain(..1)
+            .into_iter()
             .next()
             .ok_or_else(|| anyhow!("Expected data in GA response"))?;
         ensure!(tag == 0x82);
 
-        // b)
-        let map_card_pubkey = map_kaa.parse_public_key(&map_card_pubkey)?;
+        let map_card_pubkey = map_kaa.parse_public_key(&map_card_pubkey_ser)?;
 
+        // b)
         println!("mapping key");
         let eph_kaa = match info.protocol.key_mapping {
             PaceKeyMapping::Gm | PaceKeyMapping::Cam => {
@@ -76,7 +90,7 @@ impl Emrtd {
                 let (tag, _) = self
                     .commands()
                     .general_authenticate(&[], false)?
-                    .drain(..1)
+                    .into_iter()
                     .next()
                     .ok_or_else(|| anyhow!("Expected data in GA response"))?;
                 ensure!(tag == 0x82);
@@ -90,7 +104,7 @@ impl Emrtd {
         let (tag, eph_card_pubk_ser) = self
             .commands()
             .general_authenticate(&[(0x83, &eph_pubk.to_bytes())], false)?
-            .drain(..1)
+            .into_iter()
             .next()
             .ok_or_else(|| anyhow!("Expected data in GA response"))?;
         ensure!(tag == 0x84);
@@ -108,17 +122,18 @@ impl Emrtd {
 
         // e), f)
         let mac_card_pubk = compute_auth_token(&k, &eph_card_pubk_ser, info)?;
-        let (tag, rx_mac_pubk) = self
+        let mauth_resp = self
             .commands()
-            .general_authenticate(&[(0x85, &mac_card_pubk)], true)?
-            .drain(..1)
+            .general_authenticate(&[(0x85, &mac_card_pubk)], true)?;
+        let (tag, rx_mac_pubk) = mauth_resp
+            .iter()
             .next()
             .ok_or_else(|| anyhow!("Expected data in GA response"))?;
-        ensure!(tag == 0x86);
+        ensure!(*tag == 0x86);
 
         let mac_pubk = compute_auth_token(&k, &eph_pubk.to_bytes(), info)?;
         ensure!(
-            rx_mac_pubk == mac_pubk,
+            &rx_mac_pubk[..] == mac_pubk,
             "Received authentication code doesn't match own"
         );
 
@@ -128,7 +143,40 @@ impl Emrtd {
             0,
         )?);
 
-        Ok(())
+        if matches!(info.protocol.key_mapping, PaceKeyMapping::Cam) {
+            let ef_dg14 = self.read_cached::<EfDg14>()?;
+            let (_, pk) = ef_dg14
+                .chip_authentication()
+                .ok_or_else(|| anyhow!("Failed fetching Chip Authentication info from EF.DG14"))?;
+            let ca_pubk = pk.public_key.to_algorithm_public_key()?.1;
+
+            let (_, aic) = mauth_resp
+                .iter()
+                .skip(1)
+                .find(|(tag, _)| *tag == 0x8a)
+                .ok_or_else(|| {
+                    anyhow!("Expected Encrypted Chip Authentication Data (0x8A) in GA response")
+                })?;
+            let caic = decrypt_aic(&aic, &k, &info)?;
+
+            let private = map_kaa.parse_private_key(&caic)?;
+            let public = map_kaa.parse_public_key(&ca_pubk.to_bytes())?;
+            let recovered_map_pubk = map_kaa.key_agreement(&private, &public)?;
+
+            // Use x of EC pubkey point
+            let map_card_pubkey_ser = if let PublicKey::EC(_) = &public {
+                let x_len = (map_card_pubkey_ser.len() - 1) / 2;
+                &map_card_pubkey_ser[1..(x_len + 1)]
+            } else {
+                &map_card_pubkey_ser[..]
+            };
+
+            ensure!(recovered_map_pubk == map_card_pubkey_ser);
+
+            return Ok(true);
+        }
+
+        Ok(false)
     }
 }
 
@@ -161,6 +209,34 @@ fn decrypt_nonce(nonce: &mut [u8], mrz: &str, info: &PaceInfo) -> Result<()> {
         }
     };
     Ok(())
+}
+
+fn decrypt_aic(aic: &[u8], k: &[u8], info: &PaceInfo) -> Result<Vec<u8>> {
+    let mut aic = aic.to_vec();
+    let mut iv = vec![0xff; 16];
+    match info.protocol.cipher.unwrap() {
+        SymmetricCipher::Tdes => bail!("3DES not supported for Chip Authentication Mapping"),
+        SymmetricCipher::Aes128 => {
+            let cipher = Aes128Cipher::from_seed(&k).unwrap();
+            cipher.enc(&mut iv, &[0; 16]).unwrap();
+            cipher.dec(&mut aic, &iv).unwrap();
+        }
+        SymmetricCipher::Aes192 => {
+            let cipher = Aes192Cipher::from_seed(&k).unwrap();
+            cipher.enc(&mut iv, &[0; 16]).unwrap();
+            cipher.dec(&mut aic, &iv).unwrap();
+        }
+        SymmetricCipher::Aes256 => {
+            let cipher = Aes256Cipher::from_seed(&k).unwrap();
+            cipher.enc(&mut iv, &[0; 16]).unwrap();
+            cipher.dec(&mut aic, &iv).unwrap();
+        }
+    };
+    // ISO/IEC 9797-1 Padding Method 2
+    let len = aic.iter().rposition(|&x| x == 0x80).unwrap_or(aic.len());
+    aic.truncate(len);
+
+    Ok(aic)
 }
 
 /// Shared secret K, uncompressed public key, PACE info
@@ -944,5 +1020,111 @@ mod tests {
         let x_bytes = x.to_be_bytes_vec();
         let from = U4096::BYTES - (x.significant_bits() + 7) / 8;
         assert_eq!(x_bytes[from..], g_hat);
+    }
+
+    #[test]
+    fn test_pace_example_i1() {
+        let pace_info =
+            PaceInfo::from_der(&hex!("3012060A 04007F00 07020204 06020201 0202010D")).unwrap();
+        let curve = crate::crypto::groups::named::brainpool_p256r1_l();
+        let map_kaa = pace_info.kaa().unwrap();
+
+        // check nonce
+        let k_pi = hex!("4E6F6FBF 7BE748B9 32C7B741 61BBA9DF");
+        let mut nonce = hex!("CB60E8E0 D85B76A9 BD304747 C2AD42E2");
+        let cipher = Aes128Cipher::from_keys(&k_pi, &[0; 16]).unwrap();
+        cipher.dec(&mut nonce, &[0; 16]).unwrap();
+        assert_eq!(nonce, hex!("658B860B C94DF6F0 44FCE6D5 C82CF8E5"));
+
+        // map nonce
+        let map_i_privk =
+            hex!("5D8BB87B D74D985A 4B7D4325 B9F7B976 FE835122 77340079 8914AA22 738135CC");
+        let map_c_pubk = hex!(
+            "04
+             A234236A A9B9621E 8EFB73B5 245C0E09 D2576E52 77183C12 08BDD552 80CAE8B3
+             04F36571 3A356E65 A451E165 ECC9AC0A C46E3771 342C8FE5 AEDD0926 85338E23"
+        );
+
+        let public = map_kaa.parse_public_key(&map_c_pubk).unwrap();
+        let private = curve
+            .scalar_field()
+            .from(U521::from_be_slice(&map_i_privk))
+            .as_montgomery();
+        let eph_kaa = generic_mapping(&PrivateKey(Box::new(private)), &public, &nonce).unwrap();
+
+        // perform key agreement
+        let eph_i_privk =
+            hex!("76ECFDAA 9841C323 A3F5FC5E 88B88DB3 EFF7E35E BF57A7E6 946CB630 006C2120");
+        let eph_c_pubk = hex!(
+            "04
+             02AD566F 3C6EC7F9 324509AD 50A51FA5 2030782A 4968FCFE DF737DAE A9933331
+             11C3B9B4 C2287789 BD137E7F 8AA882E2 A3C633CC D6ECC2C6 3C57AD40 1A09C2E1"
+        );
+        let k = hex!("67950559 D0C06B4D 4B86972D 14460837 461087F8 419FDBC3 6AAF6CEA AC462832");
+
+        let public = eph_kaa.parse_public_key(&eph_c_pubk).unwrap();
+        let private = curve
+            .scalar_field()
+            .from(U521::from_be_slice(&eph_i_privk))
+            .as_montgomery();
+        let k_computed = eph_kaa
+            .key_agreement(&PrivateKey(Box::new(private)), &public)
+            .unwrap();
+        assert_eq!(k_computed, k);
+
+        // mutual authentication
+        let token_computed = compute_auth_token(&k, &eph_c_pubk, &pace_info).unwrap();
+        assert_eq!(token_computed, hex!("E86BD060 18A1CD3B"));
+
+        // chip auth
+        let chip_auth_pubk_info = hex!(
+            "30620609 04007F00 07020201 02305230
+             0C060704 007F0007 01020201 0D034200
+             04187270 9494399E 7470A643 1BE25E83
+             EEE24FEA 568C2ED2 8DB48E05 DB3A610D
+             C884D256 A40E35EF CB59BF67 53D3A489
+             D28C7A4D 973C2DA1 38A6E7A4 A08F68E1
+             6F02010D"
+        );
+
+        let mut c_auth_data = hex!(
+            "1EEA964D AAE372AC 990E3EFD E6333353 BFC89A67 04D93DA8
+             798CF77F 5B7A54BD 10CBA372 B42BE0B9 B5F28AA8 DE2F4F92"
+        )
+        .to_vec();
+        let dec_c_auth_data = hex!(
+            "85DC3FA9 3D0952BF A82F5FD1 89EE75BD
+             82F11D1F 0B8ED4BF 5319AC9B 53C426B3"
+        );
+        let iv = hex!("F6A3B75A1 E933941 DD7A13E2 520779DF");
+        let c_pubk_info = hex!(
+            "04
+             18727094 94399E74 70A6431B E25E83EE E24FEA56 8C2ED28D B48E05DB 3A610DC8
+             84D256A4 0E35EFCB 59BF6753 D3A489D2 8C7A4D97 3C2DA138 A6E7A4A0 8F68E16F"
+        );
+
+        let cipher = Aes128Cipher::from_seed(&k).unwrap();
+        let mut iv_computed = vec![0xff; 16];
+        cipher.enc(&mut iv_computed, &[0; 16]).unwrap();
+        assert_eq!(&iv_computed, &iv);
+
+        cipher.dec(&mut c_auth_data, &iv).unwrap();
+        // [ISO/IEC 9797-1] “Padding Method 2”.
+        let len = c_auth_data
+            .iter()
+            .rposition(|&x| x == 0x80)
+            .unwrap_or(c_auth_data.len());
+        assert_eq!(c_auth_data[..len], dec_c_auth_data);
+
+        let private = curve
+            .scalar_field()
+            .from(U521::from_be_slice(&dec_c_auth_data))
+            .as_montgomery();
+        let public = map_kaa.parse_public_key(&c_pubk_info).unwrap();
+        let recovered_map_pubk = map_kaa
+            .key_agreement(&PrivateKey(Box::new(private)), &public)
+            .unwrap();
+        let map_c_pubk_x = &map_c_pubk[1..33];
+        assert_eq!(&recovered_map_pubk, &map_c_pubk_x);
     }
 }

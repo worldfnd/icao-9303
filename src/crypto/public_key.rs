@@ -61,10 +61,10 @@ impl PublicKey {
     }
 
     /// Returns the public key as bytes following the BSI TR-03111
-    /// representation
+    /// representation.
+    /// EC points are represented uncompressed.
     pub fn to_bytes(&self) -> Vec<u8> {
-        let mut codec = BsiTr031111Codec::default();
-        codec.compressed_points = false;
+        let codec = BsiTr031111Codec::uncompressed();
         match self {
             PublicKey::DH(key) => {
                 let mut bytes = Vec::new();

@@ -29,6 +29,15 @@ impl Default for BsiTr031111Codec {
     }
 }
 
+impl BsiTr031111Codec {
+    pub fn uncompressed() -> Self {
+        Self {
+            uint_bytes:        None,
+            compressed_points: false,
+        }
+    }
+}
+
 /// BSI TR-03111 3.1.2: Conversion between Integers and Octet Strings
 impl<const BITS: usize, const LIMBS: usize> Codec<Uint<BITS, LIMBS>> for BsiTr031111Codec {
     type Parent = ();

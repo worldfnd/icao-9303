@@ -18,6 +18,7 @@ type U521 = ruint::Uint<521, 9>;
 /// Object safe trait for key agreement algorithms
 pub trait KeyAgreementAlgorithm: Debug {
     fn parse_public_key(&self, bytes: &[u8]) -> Result<PublicKey>;
+    fn parse_private_key(&self, bytes: &[u8]) -> Result<PrivateKey>;
     fn generate_key_pair(&self, rng: &mut dyn CryptoCoreRng) -> (PrivateKey, PublicKey);
     fn key_agreement(&self, private: &PrivateKey, public: &PublicKey) -> Result<Vec<u8>>;
 }
@@ -37,6 +38,14 @@ impl KeyAgreementAlgorithm for ModPGroup<U4096, U4096> {
             key:   int.to_uint(),
         };
         Ok(PublicKey::DH(dhkey))
+    }
+
+    fn parse_private_key(&self, bytes: &[u8]) -> Result<PrivateKey> {
+        let int = self
+            .scalar_field()
+            .from(U4096::from_be_slice(bytes))
+            .to_uint();
+        Ok(PrivateKey(Box::new(int)))
     }
 
     fn generate_key_pair(&self, rng: &mut dyn CryptoCoreRng) -> (PrivateKey, PublicKey) {
@@ -77,6 +86,14 @@ impl KeyAgreementAlgorithm for EllipticCurve<U521> {
             point: (point.x().unwrap().to_uint(), point.y().unwrap().to_uint()),
         };
         Ok(PublicKey::EC(eckey))
+    }
+
+    fn parse_private_key(&self, bytes: &[u8]) -> Result<PrivateKey> {
+        let int = self
+            .scalar_field()
+            .from(U521::from_be_slice(bytes))
+            .as_montgomery();
+        Ok(PrivateKey(Box::new(int)))
     }
 
     fn generate_key_pair(&self, rng: &mut dyn super::CryptoCoreRng) -> (PrivateKey, PublicKey) {
