@@ -29,7 +29,7 @@ fn main() -> Result<()> {
 
     // println!("=== Basic Access Control.");
     let mrz = env::var("MRZ")?;
-    card.basic_access_control(&mut rng, &mrz)
+    card.basic_access_control(&mut rng, &mrz.try_into()?)
         .context("Error during Basic Access Control.")?;
     eprintln!("Basic Access Control successful.");
 

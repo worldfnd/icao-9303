@@ -91,15 +91,15 @@ fn set_parity_bits(key: &mut [u8]) {
 mod tests {
     use {
         super::{super::SecureMessaging, *},
-        crate::emrtd::{pad, secure_messaging::Encrypted, seed_from_mrz},
+        crate::emrtd::{pad, secure_messaging::Encrypted, MrzInfo},
         hex_literal::hex,
     };
 
     /// Example from ICAO 9303-11 section D.2
     #[test]
     fn test_bac_example() {
-        let mrz = "L898902C<369080619406236";
-        let seed = seed_from_mrz(mrz);
+        let mrz = MrzInfo::try_from("L898902C<369080619406236").unwrap();
+        let seed = mrz.seed();
         assert_eq!(seed, hex!("239AB9CB282DAF66231DC5A4DF6BFBAE"));
 
         let (kenc, kmac) = (kdf(&seed, KDF_ENC), kdf(&seed, KDF_MAC));
