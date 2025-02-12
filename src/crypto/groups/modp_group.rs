@@ -9,7 +9,7 @@ use {
     anyhow::{ensure, Result},
 };
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ModPGroup<U: UintMont, V: UintMont> {
     base_field:      ModRing<U>,
     scalar_field:    ModRing<V>,

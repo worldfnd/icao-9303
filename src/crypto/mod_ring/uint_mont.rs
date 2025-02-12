@@ -21,6 +21,7 @@ pub trait UintMont:
     + ConstantTimeEq
     + ConditionallySelectable
     + UintExp
+    + TryFrom<der::asn1::Int>
 {
     fn parameters_from_modulus(modulus: Self) -> ModRing<Self>;
     fn from_u64(value: u64) -> Self;

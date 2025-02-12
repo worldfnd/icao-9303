@@ -5,7 +5,10 @@ mod modp_group;
 mod mul_group;
 pub mod named;
 
-pub use self::elliptic_curve::{EllipticCurve, EllipticCurvePoint};
+pub use self::{
+    elliptic_curve::{EllipticCurve, EllipticCurvePoint},
+    modp_group::ModPGroup,
+};
 use {
     super::CryptoCoreRng,
     num_traits::Inv,

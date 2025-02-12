@@ -3,9 +3,9 @@ use {
     super::Codec,
     crate::crypto::{
         groups::{EllipticCurve, EllipticCurvePoint},
-        mod_ring::{ModRingElement, RingRef, RingRefExt},
+        mod_ring::{ModRingElement, RingRef, RingRefExt, UintMont},
     },
-    anyhow::{anyhow, ensure, Result},
+    anyhow::{anyhow, bail, ensure, Result},
     bytes::{Buf, BufMut},
     ruint::Uint,
 };
@@ -129,6 +129,39 @@ impl<'a, const BITS: usize, const LIMBS: usize> Codec<EllipticCurvePoint<'a, Uin
             _ => Err(anyhow!("Invalid byte for elliptic curve point")),
         }
     }
+}
+
+/// Parse EC point over `UintMont`
+pub fn parse_ec_point<'a, U: UintMont>(curve: &'a EllipticCurve<U>, os: &[u8]) -> Result<(U, U)> {
+    let coords = &os[1..];
+    match os[0] {
+        0 => bail!("Infinity point"),
+        2 | 3 => {
+            let x = U::from_be_bytes(coords);
+            let x_elem = curve.base_field().from(x);
+            let p = curve
+                .from_x(x_elem)
+                .ok_or_else(|| anyhow!("Invalid x coordinate"))?;
+            let y = p
+                .y()
+                .ok_or_else(|| anyhow!("Failed deriving EC point y"))?
+                .to_uint();
+            Ok((x, y))
+        }
+        4 => parse_ec_point_uncompressed(coords),
+        _ => bail!("Invalid byte for elliptic curve point"),
+    }
+}
+
+/// Parse EC point over `UintMont`, uncompressed
+pub fn parse_ec_point_uncompressed<'a, U: UintMont>(os: &[u8]) -> Result<(U, U)> {
+    ensure!(os[0] == 4, "Unhandled compressed point");
+    let coords = &os[1..];
+    let (x_bytes, y_bytes) = coords.split_at(coords.len() / 2);
+
+    let x = U::from_be_bytes(x_bytes);
+    let y = U::from_be_bytes(y_bytes);
+    Ok((x, y))
 }
 
 #[cfg(test)]

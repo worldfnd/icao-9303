@@ -1,27 +1,29 @@
 use {
     super::{
+        codec::{BsiTr031111Codec, BufMutCodec},
+        dh::DHPublicKey,
         ecdsa::{ECPublicKey, ECSignature},
         mod_ring::RingRefExt,
         rsa::RSAPublicKey,
+        uint::*,
     },
     crate::asn1::{
         public_key_info::SubjectPublicKeyInfo, signature_algorithm_identifier::EcdsaSigValue,
         SignatureAlgorithmIdentifier,
     },
-    anyhow::Result,
+    anyhow::{bail, Result},
     der::{Decode, Encode},
-    ruint::{aliases::*, Uint},
 };
-
-type U521 = Uint<521, 9>;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PublicKey {
-    EC(ECPublicKey<U521>),
-    RSA(RSAPublicKey<U4096>),
+    DH(DHPublicKey<DhUint, DhsUint>),
+    EC(ECPublicKey<EcUint>),
+    RSA(RSAPublicKey<RsaUint>),
 }
 
 impl PublicKey {
+    /// Verify a signature
     pub fn verify(
         &self,
         message: &[u8],
@@ -34,11 +36,11 @@ impl PublicKey {
                 let r_elem = key
                     .curve
                     .scalar_field()
-                    .from(U521::from_be_slice(&r.as_bytes()));
+                    .from(EcUint::from_be_slice(&r.as_bytes()));
                 let s_elem = key
                     .curve
                     .scalar_field()
-                    .from(U521::from_be_slice(&s.as_bytes()));
+                    .from(EcUint::from_be_slice(&s.as_bytes()));
                 let ecsig = ECSignature {
                     r: r_elem,
                     s: s_elem,
@@ -47,11 +49,31 @@ impl PublicKey {
                 key.verify(message, &ecsig, signature_algorithm)
             }
             PublicKey::RSA(key) => {
-                let sigint = U4096::from_be_slice(&signature);
+                let sigint = RsaUint::from_be_slice(&signature);
                 let rsasig = key.ring.from(sigint);
 
                 key.verify(message, rsasig, signature_algorithm)
             }
+            _ => bail!("Not possible verifying signatures with {:?}", self),
+        }
+    }
+
+    /// Returns the public key as bytes following the BSI TR-03111
+    /// representation
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let codec = BsiTr031111Codec::default();
+        match self {
+            PublicKey::DH(key) => {
+                let mut bytes = Vec::new();
+                bytes.put_codec(&codec, key.key);
+                bytes
+            }
+            PublicKey::EC(key) => {
+                let mut bytes = Vec::new();
+                bytes.put_codec(&codec, key.point().unwrap());
+                bytes
+            }
+            _ => todo!(),
         }
     }
 }

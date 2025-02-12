@@ -37,14 +37,17 @@ fn main() -> Result<()> {
 
             // Construct elliptic curve and document public key point.
             let (algo, doc_public_key) = capk.public_key.to_algorithm_public_key()?;
-            println!("   - Algorithm: {algo}");
-            println!("   - Card Public Key: {}", hex::encode(&doc_public_key));
+            println!("   - Algorithm: {algo:?}");
+            println!(
+                "   - Card Public Key: {}",
+                hex::encode(doc_public_key.to_bytes())
+            );
 
             // Generate keypair
             let mut rng = rand::thread_rng();
             let (private_key, public_key) = algo.generate_key_pair(&mut rng);
             // println!("   - Private key: {:x}", private_key);
-            println!("   - Public key: {}", hex::encode(&public_key));
+            println!("   - Public key: {}", hex::encode(public_key.to_bytes()));
 
             // Compute shared secret
             let shared_secret = algo.key_agreement(&private_key, &doc_public_key)?;

@@ -14,8 +14,9 @@ use {
 
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 pub enum SubjectPublicKeyInfo {
-    RSA(RsaPublicKeyInfo),
+    DH((DhAlgoParameters, DhPublicKeyInfo)),
     EC((ECAlgoParameters, EcPublicKeyInfo)),
+    RSA(RsaPublicKeyInfo),
     Unknown(AnySubjectPublicKeyInfo),
 }
 
@@ -34,6 +35,11 @@ pub struct RsaPublicKeyInfo {
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord, Sequence, ValueOrd)]
 pub struct EcPublicKeyInfo {
     pub point: ECPoint,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord, Sequence, ValueOrd)]
+pub struct DhPublicKeyInfo {
+    pub key: Int,
 }
 
 /// Diffie-Hellman Mod-P Group Parameters.
@@ -84,6 +90,7 @@ impl SubjectPublicKeyInfo {
     pub fn bit_len(&self) -> usize {
         match self {
             Self::RSA(_info) => todo!(),
+            Self::DH(_info) => todo!(),
             Self::EC((_params, _info)) => todo!(),
             Self::Unknown(info) => info.subject_public_key.bit_len(),
         }
@@ -105,6 +112,7 @@ impl EncodeValue for SubjectPublicKeyInfo {
     fn value_len(&self) -> Result<Length> {
         match self {
             Self::RSA(_info) => todo!(),
+            Self::DH(_info) => todo!(),
             Self::EC((params, info)) => {
                 let algo = PubkeyAlgorithmIdentifier::Ec(params.clone());
                 let key_bits = BitString::new(0, info.point.as_bytes())?;
@@ -117,6 +125,7 @@ impl EncodeValue for SubjectPublicKeyInfo {
     fn encode_value(&self, writer: &mut impl Writer) -> Result<()> {
         match self {
             Self::RSA(_info) => todo!(),
+            Self::DH(_info) => todo!(),
             Self::EC((params, info)) => {
                 PubkeyAlgorithmIdentifier::Ec(params.clone()).encode(writer)?;
                 BitString::new(0, info.point.as_bytes())?.encode(writer)
