@@ -148,7 +148,7 @@ pub fn parse_ec_point<'a, U: UintMont>(curve: &'a EllipticCurve<U>, os: &[u8]) -
                 .to_uint();
             Ok((x, y))
         }
-        4 => parse_ec_point_uncompressed(coords),
+        4 => parse_ec_point_uncompressed(os),
         _ => bail!("Invalid byte for elliptic curve point"),
     }
 }
