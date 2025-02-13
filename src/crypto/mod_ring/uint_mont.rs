@@ -13,6 +13,7 @@ use {
 /// const-generic parameters everywhere.
 pub trait UintMont:
     Sized
+    + 'static
     + Copy
     + PartialEq
     + Eq
@@ -142,7 +143,8 @@ impl<const BITS: usize, const LIMBS: usize> UintMont for Uint<BITS, LIMBS> {
 
     #[inline]
     fn from_be_bytes(bytes: &[u8]) -> Self {
-        Self::from_be_slice(bytes)
+        let init = bytes.iter().position(|x| *x != 0).unwrap_or(0);
+        Self::from_be_slice(&bytes[init..])
     }
 
     #[inline]
