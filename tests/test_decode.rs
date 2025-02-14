@@ -5,8 +5,9 @@ use {
     cms::content_info::CmsVersion,
     dataset::Dataset,
     der::Decode,
+    hex_literal::hex,
     icao_9303::asn1::{
-        emrtd::{security_info::SecurityInfo, EfDg1, EfDg14, EfSod},
+        emrtd::{security_info::SecurityInfo, EfDg1, EfDg14, EfDg2, EfSod},
         DigestAlgorithmIdentifier,
     },
 };
@@ -19,6 +20,17 @@ fn test_decode_dg1() -> Result<()> {
     assert_eq!(mrz.secondary_identifier, "ERIKA");
     assert_eq!(mrz.date_of_birth, "960812");
     assert_eq!(mrz.date_of_expiry, "231031");
+    Ok(())
+}
+
+#[test]
+fn test_decode_dg2() -> Result<()> {
+    let dataset = Dataset::load()?;
+    let dg2 = EfDg2::from_der(&dataset.dg2)?;
+    let info = &dg2.infos()[0];
+    assert_eq!(info.header.btype.as_ref().unwrap().as_bytes(), &hex!("02"));
+    assert_eq!(info.header.format_owner.as_bytes(), &hex!("01 01"));
+    assert_eq!(info.header.format_type.as_bytes(), &hex!("00 08"));
     Ok(())
 }
 
