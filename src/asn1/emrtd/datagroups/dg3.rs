@@ -3,19 +3,19 @@ use {
     der::{self, Decode, Encode, Length, Reader, Writer},
 };
 
-/// EF.DG2 contains biometric data (face).
+/// EF.DG3 (optional) contains biometric data (finger).
 ///
-/// See ICAO-9303-10 4.7.2
+/// See ICAO-9303-10 4.7.3
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct EfDg2(BiometricInformationGroupTagged<0x75>);
+pub struct EfDg3(BiometricInformationGroupTagged<0x63>);
 
-impl EfDg2 {
+impl EfDg3 {
     pub fn infos(&self) -> &[BiometricInformation] {
         &self.0.infos()
     }
 }
 
-impl Encode for EfDg2 {
+impl Encode for EfDg3 {
     fn encoded_len(&self) -> der::Result<Length> {
         self.0.encoded_len()
     }
@@ -25,7 +25,7 @@ impl Encode for EfDg2 {
     }
 }
 
-impl<'a> Decode<'a> for EfDg2 {
+impl<'a> Decode<'a> for EfDg3 {
     fn decode<R: Reader<'a>>(reader: &mut R) -> der::Result<Self> {
         let group = BiometricInformationGroupTagged::decode(reader)?;
         Ok(Self(group))
