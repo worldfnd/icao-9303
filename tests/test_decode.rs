@@ -6,10 +6,21 @@ use {
     dataset::Dataset,
     der::Decode,
     icao_9303::asn1::{
-        emrtd::{security_info::SecurityInfo, EfDg14, EfSod},
+        emrtd::{security_info::SecurityInfo, EfDg1, EfDg14, EfSod},
         DigestAlgorithmIdentifier,
     },
 };
+
+#[test]
+fn test_decode_dg1() -> Result<()> {
+    let dataset = Dataset::load()?;
+    let dg1 = EfDg1::from_der(&dataset.dg1)?;
+    let mrz = dg1.data()?;
+    assert_eq!(mrz.secondary_identifier, "ERIKA");
+    assert_eq!(mrz.date_of_birth, "960812");
+    assert_eq!(mrz.date_of_expiry, "231031");
+    Ok(())
+}
 
 #[test]
 fn test_decode_dg14() -> Result<()> {

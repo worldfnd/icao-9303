@@ -4,7 +4,7 @@ pub use self::file_id::{DedicatedId, FileId};
 use {
     super::{Emrtd, Error, Result},
     crate::{
-        asn1::emrtd::{EfCardAccess, EfDg14, EfSod},
+        asn1::emrtd::{EfCardAccess, EfDg1, EfDg14, EfSod},
         ensure_err,
         iso7816::StatusWord,
     },
@@ -24,6 +24,10 @@ impl HasFileId for EfSod {
 
 impl HasFileId for EfCardAccess {
     const FILE_ID: FileId = FileId::CardAccess;
+}
+
+impl HasFileId for EfDg1 {
+    const FILE_ID: FileId = FileId::Dg1;
 }
 
 impl HasFileId for EfDg14 {
