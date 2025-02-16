@@ -7,7 +7,10 @@ use {
     der::Decode,
     hex_literal::hex,
     icao_9303::asn1::{
-        emrtd::{security_info::SecurityInfo, EfDg1, EfDg14, EfDg2, EfDg3, EfDg4, EfSod},
+        emrtd::{
+            biometric::Side, security_info::SecurityInfo, EfDg1, EfDg14, EfDg2, EfDg3, EfDg4,
+            EfSod, Finger,
+        },
         DigestAlgorithmIdentifier,
     },
 };
@@ -40,18 +43,14 @@ fn test_decode_dg3() -> Result<()> {
     let dg3 = EfDg3::from_der(&dataset.dg3)?;
     let right = &dg3.infos()[0];
     assert_eq!(right.header.btype.as_ref().unwrap().as_bytes(), &hex!("08"));
-    assert_eq!(
-        right.header.bsubtype.as_ref().unwrap().as_bytes(),
-        &hex!("09")
-    );
     assert_eq!(right.header.format_owner.as_bytes(), &hex!("01 01"));
+    assert_eq!(right.header.bsubtype.side, Side::Right);
+    assert_eq!(right.header.bsubtype.finger, Finger::Pointer);
     let left = &dg3.infos()[1];
     assert_eq!(left.header.btype.as_ref().unwrap().as_bytes(), &hex!("08"));
-    assert_eq!(
-        left.header.bsubtype.as_ref().unwrap().as_bytes(),
-        &hex!("0A")
-    );
     assert_eq!(left.header.format_owner.as_bytes(), &hex!("01 01"));
+    assert_eq!(left.header.bsubtype.side, Side::Left);
+    assert_eq!(left.header.bsubtype.finger, Finger::Pointer);
     Ok(())
 }
 
@@ -62,17 +61,11 @@ fn test_decode_dg4() -> Result<()> {
     let right = &dg4.infos()[0];
     assert_eq!(right.header.btype.as_ref().unwrap().as_bytes(), &hex!("10"));
     assert_eq!(right.header.format_owner.as_bytes(), &hex!("01 01"));
-    assert_eq!(
-        right.header.bsubtype.as_ref().unwrap().as_bytes(),
-        &hex!("01")
-    );
+    assert_eq!(right.header.bsubtype.side, Side::Right);
     let left = &dg4.infos()[1];
     assert_eq!(left.header.btype.as_ref().unwrap().as_bytes(), &hex!("10"));
     assert_eq!(left.header.format_owner.as_bytes(), &hex!("01 01"));
-    assert_eq!(
-        left.header.bsubtype.as_ref().unwrap().as_bytes(),
-        &hex!("02")
-    );
+    assert_eq!(left.header.bsubtype.side, Side::Left);
     Ok(())
 }
 

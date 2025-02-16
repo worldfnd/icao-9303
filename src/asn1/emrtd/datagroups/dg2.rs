@@ -7,10 +7,10 @@ use {
 ///
 /// See ICAO-9303-10 4.7.2
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct EfDg2(BiometricInformationGroupTagged<0x75>);
+pub struct EfDg2(BiometricInformationGroupTagged<0x75, BiometricSubtype>);
 
 impl EfDg2 {
-    pub fn infos(&self) -> &[BiometricInformation] {
+    pub fn infos(&self) -> &[BiometricInformation<BiometricSubtype>] {
         &self.0.infos()
     }
 }

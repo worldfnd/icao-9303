@@ -1,4 +1,4 @@
-mod datagroups;
+pub mod datagroups;
 pub mod security_info;
 
 pub use datagroups::*;
