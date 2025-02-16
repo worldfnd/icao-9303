@@ -36,8 +36,7 @@ pub struct BiometricHeader<S: BiometricSubtyped = BiometricSubtype> {
     #[asn1(context_specific = "1", optional = "true")]
     pub btype:         Option<OctetString>, // '01-03' length
     /// Biometric sub-type
-    //#[asn1(context_specific = "2", optional = "true")]
-    pub bsubtype: S, // '01' length
+    pub bsubtype:      S, // '01' length
     /// Creation date and time
     #[asn1(context_specific = "3", optional = "true")]
     pub creation_date: Option<OctetString>, // '07' length
@@ -178,6 +177,19 @@ impl<'a, S: BiometricSubtyped> Decode<'a> for BiometricInformationGroup<S> {
             };
 
             insts.push(BiometricInformation { header, data });
+        }
+
+        // Encoding of zero instance, recommended tag 0x53 with random data
+        if no_inst == 0 && reader.remaining_len() > 0u8.into() {
+            let tag_53 = reader.read_byte()?;
+            if tag_53 != 0x53 {
+                return Err(Error::new(ErrorKind::TagNumberInvalid, reader.position()));
+            };
+            let len = Length::decode(reader)?;
+            OctetString::decode_value(reader, der::Header {
+                tag:    der::Tag::Null, // 0x53
+                length: len,
+            })?;
         }
 
         Ok(Self(insts))

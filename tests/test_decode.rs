@@ -44,13 +44,13 @@ fn test_decode_dg3() -> Result<()> {
     let right = &dg3.infos()[0];
     assert_eq!(right.header.btype.as_ref().unwrap().as_bytes(), &hex!("08"));
     assert_eq!(right.header.format_owner.as_bytes(), &hex!("01 01"));
-    assert_eq!(right.header.bsubtype.side, Side::Right);
-    assert_eq!(right.header.bsubtype.finger, Finger::Pointer);
+    assert_eq!(right.finger().side, Side::Right);
+    assert_eq!(right.finger().finger, Finger::Pointer);
     let left = &dg3.infos()[1];
     assert_eq!(left.header.btype.as_ref().unwrap().as_bytes(), &hex!("08"));
     assert_eq!(left.header.format_owner.as_bytes(), &hex!("01 01"));
-    assert_eq!(left.header.bsubtype.side, Side::Left);
-    assert_eq!(left.header.bsubtype.finger, Finger::Pointer);
+    assert_eq!(left.finger().side, Side::Left);
+    assert_eq!(left.finger().finger, Finger::Pointer);
     Ok(())
 }
 
@@ -61,11 +61,11 @@ fn test_decode_dg4() -> Result<()> {
     let right = &dg4.infos()[0];
     assert_eq!(right.header.btype.as_ref().unwrap().as_bytes(), &hex!("10"));
     assert_eq!(right.header.format_owner.as_bytes(), &hex!("01 01"));
-    assert_eq!(right.header.bsubtype.side, Side::Right);
+    assert_eq!(right.iris().side, Side::Right);
     let left = &dg4.infos()[1];
     assert_eq!(left.header.btype.as_ref().unwrap().as_bytes(), &hex!("10"));
     assert_eq!(left.header.format_owner.as_bytes(), &hex!("01 01"));
-    assert_eq!(left.header.bsubtype.side, Side::Left);
+    assert_eq!(left.iris().side, Side::Left);
     Ok(())
 }
 

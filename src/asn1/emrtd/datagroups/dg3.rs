@@ -42,6 +42,12 @@ impl EfDg3 {
     }
 }
 
+impl BiometricInformation<BiometricFinger> {
+    pub fn finger(&self) -> BiometricFinger {
+        self.header.bsubtype
+    }
+}
+
 impl BiometricFinger {
     pub fn from_byte(byte: u8) -> Self {
         let side_bits = byte & 0b11;

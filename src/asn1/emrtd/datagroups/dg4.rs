@@ -22,6 +22,12 @@ impl EfDg4 {
     }
 }
 
+impl BiometricInformation<BiometricIris> {
+    pub fn iris(&self) -> BiometricIris {
+        self.header.bsubtype
+    }
+}
+
 impl BiometricIris {
     pub fn from_byte(byte: u8) -> Self {
         let side_bits = byte & 0b11;
