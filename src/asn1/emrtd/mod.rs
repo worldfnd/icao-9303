@@ -1,5 +1,7 @@
+mod com;
 pub mod security_info;
 
+pub use self::com::{ApplicationLevelInformation, EfCom};
 use {
     self::security_info::{
         ChipAuthenticationInfo, ChipAuthenticationPublicKeyInfo, SecurityInfo, SecurityInfos,

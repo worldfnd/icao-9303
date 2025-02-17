@@ -70,6 +70,9 @@ pub enum Error {
     #[error("Invalid Short File ID")]
     InvalidShortFileId,
 
+    #[error("Invalid ASN.1 Tag")]
+    InvalidTag,
+
     #[error("File not found.")]
     FileNotFound,
 }

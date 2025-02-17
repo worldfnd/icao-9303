@@ -7,9 +7,7 @@ use der::{
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ApplicationTagged<const APPLICATION: u8, T>(pub T);
 
-impl<const APPLICATION: u8, T: for<'a> DecodeValue<'a>> FixedTag
-    for ApplicationTagged<APPLICATION, T>
-{
+impl<const APPLICATION: u8, T> FixedTag for ApplicationTagged<APPLICATION, T> {
     const TAG: Tag = Tag::Application {
         constructed: true,
         number:      TagNumber::new(APPLICATION),

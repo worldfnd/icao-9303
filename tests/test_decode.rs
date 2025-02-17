@@ -5,11 +5,29 @@ use {
     cms::content_info::CmsVersion,
     dataset::Dataset,
     der::Decode,
-    icao_9303::asn1::{
-        emrtd::{security_info::SecurityInfo, EfDg14, EfSod},
-        DigestAlgorithmIdentifier,
+    icao_9303::{
+        asn1::{
+            emrtd::{security_info::SecurityInfo, EfCom, EfDg14, EfSod},
+            DigestAlgorithmIdentifier,
+        },
+        emrtd::{FileId, HasFileId},
     },
 };
+
+#[test]
+fn test_decode_com() -> Result<()> {
+    let dataset = Dataset::load()?;
+    let com = EfCom::from_der(&dataset.com)?;
+    let dgs = com.dgs_present()?;
+
+    ensure!(dgs.iter().any(|&dg| dg == EfDg14::FILE_ID));
+    ensure!(dgs.iter().any(|&dg| dg == FileId::Dg1));
+    ensure!(dgs.iter().any(|&dg| dg == FileId::Dg2));
+    ensure!(dgs.iter().any(|&dg| dg == FileId::Dg3));
+    ensure!(dgs.iter().any(|&dg| dg == FileId::Dg4));
+
+    Ok(())
+}
 
 #[test]
 fn test_decode_dg14() -> Result<()> {

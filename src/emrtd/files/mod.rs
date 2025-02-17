@@ -4,7 +4,7 @@ pub use self::file_id::{DedicatedId, FileId};
 use {
     super::{Emrtd, Error, Result},
     crate::{
-        asn1::emrtd::{EfCardAccess, EfDg14, EfSod},
+        asn1::emrtd::{EfCardAccess, EfCom, EfDg14, EfSod},
         ensure_err,
         iso7816::StatusWord,
     },
@@ -20,6 +20,10 @@ pub trait HasFileId {
 
 impl HasFileId for EfSod {
     const FILE_ID: FileId = FileId::Sod;
+}
+
+impl HasFileId for EfCom {
+    const FILE_ID: FileId = FileId::Com;
 }
 
 impl HasFileId for EfCardAccess {
@@ -182,5 +186,14 @@ fn sniff_len(bytes: &[u8]) -> Result<Option<usize>> {
                 Err(e.into())
             }
         }
+    }
+}
+
+impl EfCom {
+    pub fn dgs_present(&self) -> Result<Vec<FileId>> {
+        self.dgs_tags_present()
+            .iter()
+            .map(|tag| FileId::try_from(*tag))
+            .collect()
     }
 }
