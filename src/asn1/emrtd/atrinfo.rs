@@ -1,8 +1,6 @@
 use der::{
-    self,
-    asn1::{OctetStringRef, PrintableString},
-    Decode, DecodeValue, EncodeValue, Error, ErrorKind, FixedTag, Header, Length, Reader, Tag,
-    TagNumber, Writer,
+    self, Decode, DecodeValue, EncodeValue, Error, ErrorKind, FixedTag, Header, Length, Reader,
+    Tag, TagNumber, Writer,
 };
 
 /// EF.ATR/INFO is composed of a [`CardCapabilities`] and a

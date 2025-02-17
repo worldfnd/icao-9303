@@ -1,7 +1,7 @@
 mod atrinfo;
+mod dir;
 pub mod security_info;
 
-pub use atrinfo::EfAtrInfo;
 use {
     self::security_info::{
         ChipAuthenticationInfo, ChipAuthenticationPublicKeyInfo, SecurityInfo, SecurityInfos,
@@ -15,6 +15,7 @@ use {
     },
     security_info::{ChipAuthenticationProtocol, KeyAgreement, SymmetricCipher},
 };
+pub use {atrinfo::EfAtrInfo, dir::EfDir};
 
 /// EF_CardAccess is a [`SecurityInfos`] with no further wrapping.
 ///

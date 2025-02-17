@@ -30,6 +30,10 @@ impl HasFileId for EfCardAccess {
     const FILE_ID: FileId = FileId::CardAccess;
 }
 
+impl HasFileId for EfDir {
+    const FILE_ID: FileId = FileId::Dir;
+}
+
 impl HasFileId for EfDg14 {
     const FILE_ID: FileId = FileId::Dg14;
 }
