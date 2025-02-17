@@ -1,5 +1,7 @@
+mod atrinfo;
 pub mod security_info;
 
+pub use atrinfo::EfAtrInfo;
 use {
     self::security_info::{
         ChipAuthenticationInfo, ChipAuthenticationPublicKeyInfo, SecurityInfo, SecurityInfos,

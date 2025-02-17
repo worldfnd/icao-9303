@@ -4,7 +4,7 @@ pub use self::file_id::{DedicatedId, FileId};
 use {
     super::{Emrtd, Error, Result},
     crate::{
-        asn1::emrtd::{EfCardAccess, EfDg14, EfSod},
+        asn1::emrtd::{EfAtrInfo, EfCardAccess, EfDg14, EfSod},
         ensure_err,
         iso7816::StatusWord,
     },
@@ -20,6 +20,10 @@ pub trait HasFileId {
 
 impl HasFileId for EfSod {
     const FILE_ID: FileId = FileId::Sod;
+}
+
+impl HasFileId for EfAtrInfo {
+    const FILE_ID: FileId = FileId::AttrInfo;
 }
 
 impl HasFileId for EfCardAccess {
