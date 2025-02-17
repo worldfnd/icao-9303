@@ -23,7 +23,7 @@ impl HasFileId for EfSod {
 }
 
 impl HasFileId for EfAtrInfo {
-    const FILE_ID: FileId = FileId::AttrInfo;
+    const FILE_ID: FileId = FileId::AtrInfo;
 }
 
 impl HasFileId for EfCardAccess {
