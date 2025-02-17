@@ -1,6 +1,7 @@
 //! ICAO 9303-10 Table 38.
 
 use {
+    super::super::{Error, Result},
     der::Tag,
     std::fmt::{self, Display, Formatter},
 };
@@ -185,10 +186,58 @@ impl FileId {
         }
     }
 
-    pub fn tag(&self) -> Tag {
+    pub fn tag(&self) -> Result<Tag> {
         match self {
-            Self::Sod => 0x77.try_into().unwrap(),
-            _ => unimplemented!(),
+            Self::Com => 0x60,
+            Self::Dg1 => 0x61,
+            Self::Dg2 => 0x75,
+            Self::Dg3 => 0x63,
+            Self::Dg4 => 0x76,
+            Self::Dg5 => 0x65,
+            Self::Dg6 => 0x66,
+            Self::Dg7 => 0x67,
+            Self::Dg8 => 0x68,
+            Self::Dg9 => 0x69,
+            Self::Dg10 => 0x6a,
+            Self::Dg11 => 0x6b,
+            Self::Dg12 => 0x6c,
+            Self::Dg13 => 0x6d,
+            Self::Dg14 => 0x6e,
+            Self::Dg15 => 0x6f,
+            Self::Dg16 => 0x70,
+            Self::Sod => 0x77,
+            Self::CardAccess | Self::Dir | Self::AttrInfo | Self::CardSecurity => {
+                return Err(Error::InvalidTag)
+            }
+        }
+        .try_into()
+        .map_err(|_| Error::InvalidTag)
+    }
+}
+
+impl TryFrom<Tag> for FileId {
+    type Error = Error;
+    fn try_from(tag: Tag) -> Result<FileId> {
+        match u8::from(tag) {
+            0x60 => Ok(Self::Com),
+            0x61 => Ok(Self::Dg1),
+            0x75 => Ok(Self::Dg2),
+            0x63 => Ok(Self::Dg3),
+            0x76 => Ok(Self::Dg4),
+            0x65 => Ok(Self::Dg5),
+            0x66 => Ok(Self::Dg6),
+            0x67 => Ok(Self::Dg7),
+            0x68 => Ok(Self::Dg8),
+            0x69 => Ok(Self::Dg9),
+            0x6a => Ok(Self::Dg10),
+            0x6b => Ok(Self::Dg11),
+            0x6c => Ok(Self::Dg12),
+            0x6d => Ok(Self::Dg13),
+            0x6e => Ok(Self::Dg14),
+            0x6f => Ok(Self::Dg15),
+            0x70 => Ok(Self::Dg16),
+            0x77 => Ok(Self::Sod),
+            _ => Err(Error::InvalidTag),
         }
     }
 }
