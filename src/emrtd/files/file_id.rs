@@ -24,7 +24,7 @@ pub enum DedicatedId {
 pub enum FileId {
     CardAccess,
     Dir, // Missing from table 38, but included in section 3.11
-    AttrInfo,
+    AtrInfo,
     CardSecurity,
     Com,
     Dg1,
@@ -68,7 +68,7 @@ impl FileId {
         [
             Self::CardAccess,
             Self::Dir,
-            Self::AttrInfo,
+            Self::AtrInfo,
             Self::CardSecurity,
             Self::Com,
             Self::Dg1,
@@ -98,7 +98,7 @@ impl FileId {
             Self::Com => "EF.COM",
             Self::CardAccess => "EF.CARDACCESS",
             Self::Dir => "EF.DIR",
-            Self::AttrInfo => "EF.ATTR/INFO",
+            Self::AtrInfo => "EF.ATTR/INFO",
             Self::CardSecurity => "EF.CardSecurity",
             Self::Dg1 => "EF.DG1",
             Self::Dg2 => "EF.DG2",
@@ -123,7 +123,7 @@ impl FileId {
     /// ICAO 9303-10 section 3.11
     pub fn parent(&self) -> DedicatedId {
         match self {
-            Self::CardAccess | Self::CardSecurity | Self::Dir | Self::AttrInfo => {
+            Self::CardAccess | Self::CardSecurity | Self::Dir | Self::AtrInfo => {
                 DedicatedId::MasterFile
             }
             _ => DedicatedId::EmrtdLds1,
@@ -133,7 +133,7 @@ impl FileId {
     pub fn file_id(&self) -> u16 {
         // CardAccess and Sod are the same, but live in different applications.
         match self {
-            Self::AttrInfo => 0x2f01,
+            Self::AtrInfo => 0x2f01,
             Self::Dir => 0x2f00,
             Self::CardAccess => 0x011c,
             Self::CardSecurity => 0x011d,
@@ -160,7 +160,7 @@ impl FileId {
 
     pub fn short_id(&self) -> u8 {
         match self {
-            Self::AttrInfo => 0x01,
+            Self::AtrInfo => 0x01,
             Self::Dir => 0x1e,
             Self::CardAccess => 0x1c,
             Self::CardSecurity => 0x1d,
