@@ -9,7 +9,7 @@ use {
 ///
 /// See ICAO-9303-10 4.7.4
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct EfDg4(BiometricInformationGroupTagged<0x76, BiometricIris>);
+pub struct EfDg4(BiometricInformationGroupTagged<BiometricIris>);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BiometricIris {
@@ -66,7 +66,11 @@ impl der::FixedTag for BiometricIris {
     };
 }
 
-impl BiometricSubtyped for BiometricIris {}
+impl BiometricType for BiometricIris {
+    const GROUP_TAG: u8 = 0x76;
+    type Subtype = Self;
+    type Data = OctetString; // TODO
+}
 
 impl Encode for EfDg4 {
     fn encoded_len(&self) -> der::Result<Length> {

@@ -11,7 +11,7 @@ use {
 ///
 /// See ICAO-9303-10 4.7.3
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct EfDg3(BiometricInformationGroupTagged<0x63, BiometricFinger>);
+pub struct EfDg3(BiometricInformationGroupTagged<BiometricFinger>);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BiometricFinger {
@@ -88,7 +88,11 @@ impl der::FixedTag for BiometricFinger {
     };
 }
 
-impl BiometricSubtyped for BiometricFinger {}
+impl BiometricType for BiometricFinger {
+    const GROUP_TAG: u8 = 0x63;
+    type Subtype = Self;
+    type Data = OctetString; // TODO
+}
 
 impl Finger {
     pub fn from_bits(bits: u8) -> Self {

@@ -1,34 +1,42 @@
 /// ! Common data for DG2, DG3, and DG4.
 use der::{
     self, asn1::OctetString, Decode, DecodeValue, Encode, EncodeValue, Error, ErrorKind, Length,
-    Reader, Sequence, Writer,
+    Reader, Sequence, Tag, Writer,
 };
 
 /// Biometric Information Template Group
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct BiometricInformationGroup<S: BiometricSubtyped>(Vec<BiometricInformation<S>>);
+pub struct BiometricInformationGroup<T: BiometricType>(Vec<BiometricInformation<T>>);
 
 /// Codec helper for Data Groups which employ Biometric Information Template
 /// Groups
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct BiometricInformationGroupTagged<const TAG: u8, S: BiometricSubtyped>(
-    BiometricInformationGroup<S>,
-);
+pub(crate) struct BiometricInformationGroupTagged<T: BiometricType>(BiometricInformationGroup<T>);
 
 /// Biometric Information Template
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct BiometricInformation<S: BiometricSubtyped> {
-    pub header: BiometricHeader<S>,
-    pub data:   BiometricData,
+pub struct BiometricInformation<T: BiometricType> {
+    pub header: BiometricHeader<T>,
+    pub data:   BiometricData<T>,
 }
 
-/// Trait for Biometric sub-types
-pub trait BiometricSubtyped: EncodeValue + for<'a> DecodeValue<'a> + der::FixedTag {}
+/// A support collection of types for the encoding of each type of Biometric
+/// data
+pub trait BiometricType {
+    const GROUP_TAG: u8;
+    type Subtype: EncodeValue
+        + for<'a> DecodeValue<'a>
+        + der::FixedTag
+        + Clone
+        + std::fmt::Debug
+        + Eq;
+    type Data: for<'a> DecodeValue<'a> + der::FixedTag + Clone + std::fmt::Debug + Eq;
+}
 
 /// Biometric Header Template (BHT)
 #[derive(Debug, Clone, PartialEq, Eq, Sequence)]
 #[asn1(tag_mode = "IMPLICIT")]
-pub struct BiometricHeader<S: BiometricSubtyped = BiometricSubtype> {
+pub struct BiometricHeader<T: BiometricType> {
     /// ICAO header version. CBEFF patron header format (0101)
     #[asn1(context_specific = "0", optional = "true")]
     pub version:       Option<OctetString>, // '02' length
@@ -36,7 +44,7 @@ pub struct BiometricHeader<S: BiometricSubtyped = BiometricSubtype> {
     #[asn1(context_specific = "1", optional = "true")]
     pub btype:         Option<OctetString>, // '01-03' length
     /// Biometric sub-type
-    pub bsubtype:      S, // '01' length
+    pub bsubtype:      T::Subtype, // '01' length
     /// Creation date and time
     #[asn1(context_specific = "3", optional = "true")]
     pub creation_date: Option<OctetString>, // '07' length
@@ -56,9 +64,9 @@ pub struct BiometricHeader<S: BiometricSubtyped = BiometricSubtype> {
 
 /// Biometric Data Block (BDB)
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct BiometricData {
+pub struct BiometricData<T: BiometricType> {
     pub encoding: BiometricDataEncoding,
-    pub bytes:    Vec<u8>,
+    pub data:     T::Data,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -68,11 +76,6 @@ pub enum BiometricDataEncoding {
     Iso39794,
 }
 
-/// Generic Biometric sub-type used in the [`BiometricHeader`].
-/// Is an optional OCTET STRING.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct BiometricSubtype(Option<OctetString>);
-
 /// Used to identify the side of a hand (DG3) or iris (DG4).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Side {
@@ -81,45 +84,7 @@ pub enum Side {
     Left          = 0b10,
 }
 
-impl BiometricSubtype {
-    pub fn as_bytes(&self) -> Option<&[u8]> {
-        self.0.as_ref().map(|os| os.as_bytes())
-    }
-}
-
-impl der::FixedTag for BiometricSubtype {
-    const TAG: der::Tag = der::Tag::ContextSpecific {
-        constructed: false,
-        number:      der::TagNumber::new(2),
-    };
-}
-impl BiometricSubtyped for BiometricSubtype {}
-
-impl EncodeValue for BiometricSubtype {
-    fn value_len(&self) -> der::Result<Length> {
-        if let Some(os) = &self.0 {
-            os.value_len()
-        } else {
-            Ok(Length::new(0))
-        }
-    }
-
-    fn encode_value(&self, encoder: &mut impl Writer) -> der::Result<()> {
-        if let Some(os) = &self.0 {
-            os.encode_value(encoder)?;
-        }
-        Ok(())
-    }
-}
-
-impl<'a> DecodeValue<'a> for BiometricSubtype {
-    fn decode_value<R: Reader<'a>>(reader: &mut R, h: der::Header) -> der::Result<Self> {
-        let bytes = reader.read_slice(h.length)?;
-        Ok(Self(Some(OctetString::new(bytes)?)))
-    }
-}
-
-impl<S: BiometricSubtyped> Encode for BiometricInformationGroup<S> {
+impl<T: BiometricType> Encode for BiometricInformationGroup<T> {
     fn encoded_len(&self) -> der::Result<Length> {
         todo!("Biometric Information Group encoding not supported yet");
     }
@@ -131,7 +96,7 @@ impl<S: BiometricSubtyped> Encode for BiometricInformationGroup<S> {
 
 // The `der` crate currently only supports single-octet tags, so we parse some
 // stuff manually.
-impl<'a, S: BiometricSubtyped> Decode<'a> for BiometricInformationGroup<S> {
+impl<'a, T: BiometricType> Decode<'a> for BiometricInformationGroup<T> {
     fn decode<R: Reader<'a>>(reader: &mut R) -> der::Result<Self> {
         let tag_7f61 = reader.read_slice(Length::new(2))?;
         if tag_7f61 != &[0x7f, 0x61] {
@@ -157,7 +122,7 @@ impl<'a, S: BiometricSubtyped> Decode<'a> for BiometricInformationGroup<S> {
                 let len = Length::decode(reader)?;
 
                 BiometricHeader::decode_value(reader, der::Header {
-                    tag:    der::Tag::Null, // 0xa1
+                    tag:    Tag::Null, // 0xa1
                     length: len,
                 })?
             };
@@ -172,7 +137,10 @@ impl<'a, S: BiometricSubtyped> Decode<'a> for BiometricInformationGroup<S> {
                 let len = Length::decode(reader)?;
                 BiometricData {
                     encoding,
-                    bytes: reader.read_vec(len)?,
+                    data: T::Data::decode_value(reader, der::Header {
+                        tag:    Tag::Null,
+                        length: len,
+                    })?,
                 }
             };
 
@@ -187,7 +155,7 @@ impl<'a, S: BiometricSubtyped> Decode<'a> for BiometricInformationGroup<S> {
             };
             let len = Length::decode(reader)?;
             OctetString::decode_value(reader, der::Header {
-                tag:    der::Tag::Null, // 0x53
+                tag:    Tag::Null, // 0x53
                 length: len,
             })?;
         }
@@ -196,13 +164,13 @@ impl<'a, S: BiometricSubtyped> Decode<'a> for BiometricInformationGroup<S> {
     }
 }
 
-impl<const TAG: u8, S: BiometricSubtyped> BiometricInformationGroupTagged<TAG, S> {
-    pub fn infos(&self) -> &[BiometricInformation<S>] {
+impl<T: BiometricType> BiometricInformationGroupTagged<T> {
+    pub fn infos(&self) -> &[BiometricInformation<T>] {
         &self.0 .0
     }
 }
 
-impl<const TAG: u8, S: BiometricSubtyped> Encode for BiometricInformationGroupTagged<TAG, S> {
+impl<T: BiometricType> Encode for BiometricInformationGroupTagged<T> {
     fn encoded_len(&self) -> der::Result<Length> {
         self.0.encoded_len()
     }
@@ -212,12 +180,10 @@ impl<const TAG: u8, S: BiometricSubtyped> Encode for BiometricInformationGroupTa
     }
 }
 
-impl<'a, const TAG: u8, S: BiometricSubtyped> Decode<'a>
-    for BiometricInformationGroupTagged<TAG, S>
-{
+impl<'a, T: BiometricType> Decode<'a> for BiometricInformationGroupTagged<T> {
     fn decode<R: Reader<'a>>(reader: &mut R) -> der::Result<Self> {
         let tag_byte = reader.read_byte()?;
-        if tag_byte != TAG {
+        if tag_byte != T::GROUP_TAG {
             return Err(Error::new(ErrorKind::TagNumberInvalid, reader.position()));
         };
         Length::decode(reader)?;
