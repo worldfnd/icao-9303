@@ -1,5 +1,5 @@
 use {
-    super::biometric::*,
+    super::{biometric::*, iso19794::*},
     der::{
         self, asn1::OctetString, Decode, DecodeValue, Encode, EncodeValue, Length, Reader, Writer,
     },
@@ -14,6 +14,12 @@ pub struct EfDg4(BiometricInformationGroupTagged<BiometricIris>);
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BiometricIris {
     pub side: Side,
+}
+
+impl BiometricType for BiometricIris {
+    const GROUP_TAG: u8 = 0x76;
+    type Subtype = Self;
+    type Data = Vec<u8>; // TODO
 }
 
 impl EfDg4 {
@@ -64,12 +70,6 @@ impl der::FixedTag for BiometricIris {
         constructed: false,
         number:      der::TagNumber::new(2),
     };
-}
-
-impl BiometricType for BiometricIris {
-    const GROUP_TAG: u8 = 0x76;
-    type Subtype = Self;
-    type Data = OctetString; // TODO
 }
 
 impl Encode for EfDg4 {

@@ -1,7 +1,10 @@
 /// ! Common data for DG2, DG3, and DG4.
-use der::{
-    self, asn1::OctetString, Decode, DecodeValue, Encode, EncodeValue, Error, ErrorKind, Length,
-    Reader, Sequence, Tag, Writer,
+use {
+    super::iso19794::DecodeIso19794,
+    der::{
+        self, asn1::OctetString, Decode, DecodeValue, Encode, EncodeValue, Error, ErrorKind,
+        Length, Reader, Sequence, Tag, Writer,
+    },
 };
 
 /// Biometric Information Template Group
@@ -30,7 +33,7 @@ pub trait BiometricType {
         + Clone
         + std::fmt::Debug
         + Eq;
-    type Data: for<'a> DecodeValue<'a> + der::FixedTag + Clone + std::fmt::Debug + Eq;
+    type Data: for<'a> DecodeIso19794<'a> + Clone + std::fmt::Debug + Eq;
 }
 
 /// Biometric Header Template (BHT)
@@ -64,10 +67,7 @@ pub struct BiometricHeader<T: BiometricType> {
 
 /// Biometric Data Block (BDB)
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct BiometricData<T: BiometricType> {
-    pub encoding: BiometricDataEncoding,
-    pub data:     T::Data,
-}
+pub struct BiometricData<T: BiometricType>(pub T::Data);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BiometricDataEncoding {
@@ -129,19 +129,16 @@ impl<'a, T: BiometricType> Decode<'a> for BiometricInformationGroup<T> {
 
             let data = {
                 let tag_xf2e = reader.read_slice(Length::new(2))?;
-                let encoding = match tag_xf2e {
+                let _encoding = match tag_xf2e {
                     &[0x5f, 0x2e] => BiometricDataEncoding::Iso19794,
                     &[0x7f, 0x2e] => BiometricDataEncoding::Iso39794,
                     _ => return Err(Error::new(ErrorKind::TagNumberInvalid, reader.position())),
                 };
-                let len = Length::decode(reader)?;
-                BiometricData {
-                    encoding,
-                    data: T::Data::decode_value(reader, der::Header {
-                        tag:    Tag::Null,
-                        length: len,
-                    })?,
-                }
+                Length::decode(reader)?;
+                BiometricData(
+                    // TODO ISO 39794
+                    T::Data::decode_iso_19794(reader)?,
+                )
             };
 
             insts.push(BiometricInformation { header, data });

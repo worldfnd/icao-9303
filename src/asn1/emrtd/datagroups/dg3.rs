@@ -1,5 +1,5 @@
 use {
-    super::biometric::*,
+    super::{biometric::*, iso19794::*},
     anyhow::anyhow,
     der::{
         self, asn1::OctetString, Decode, DecodeValue, Encode, EncodeValue, Error, ErrorKind,
@@ -17,6 +17,12 @@ pub struct EfDg3(BiometricInformationGroupTagged<BiometricFinger>);
 pub struct BiometricFinger {
     pub side:   Side,
     pub finger: Finger,
+}
+
+impl BiometricType for BiometricFinger {
+    const GROUP_TAG: u8 = 0x63;
+    type Subtype = Self;
+    type Data = Vec<u8>; // TODO
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -86,12 +92,6 @@ impl der::FixedTag for BiometricFinger {
         constructed: false,
         number:      der::TagNumber::new(2),
     };
-}
-
-impl BiometricType for BiometricFinger {
-    const GROUP_TAG: u8 = 0x63;
-    type Subtype = Self;
-    type Data = OctetString; // TODO
 }
 
 impl Finger {
