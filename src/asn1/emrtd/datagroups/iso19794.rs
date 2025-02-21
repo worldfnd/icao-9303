@@ -48,6 +48,17 @@ impl<'a> DecodeIso19794<'a> for u16 {
     }
 }
 
+impl<'a> DecodeIso19794<'a> for i16 {
+    fn decode_iso_19794<R: Reader<'a>>(reader: &mut R) -> Result<Self, Error> {
+        Ok(i16::from_be_bytes(
+            reader
+                .read_slice(2u8.into())?
+                .try_into()
+                .map_err(|_| Error::new(ErrorKind::Failed, reader.position()))?,
+        ))
+    }
+}
+
 impl<'a> DecodeIso19794<'a> for u32 {
     fn decode_iso_19794<R: Reader<'a>>(reader: &mut R) -> Result<Self, Error> {
         Ok(u32::from_be_bytes(
