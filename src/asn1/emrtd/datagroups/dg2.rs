@@ -37,8 +37,8 @@ impl BiometricFace {
 }
 
 impl BiometricInformation<BiometricFace> {
-    pub fn representations(&self) -> &[FaceRepresentation] {
-        &self.data.0.representations
+    pub fn representations(&self) -> &[FaceRecord] {
+        &self.data.0.records
     }
 }
 
@@ -96,13 +96,20 @@ impl<'a> Decode<'a> for EfDg2 {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BiometricFaceData {
-    pub general_header:  GeneralHeader,
-    pub representations: Vec<FaceRepresentation>,
+    pub header:  FaceGeneralHeader,
+    pub records: Vec<FaceRecord>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FaceGeneralHeader {
+    pub format_identifier: FormatIdentifier, // 4 bytes
+    pub version_number:    VersionNumber,    // 4 bytes
+    pub records_length:    u32,              // 4 bytes
+    pub records_count:     u16,              // 2 bytes
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FaceRepresentation {
-    // Representation Header fields
+pub struct FaceRecord {
     pub face_information:  FacialInformation,
     pub feature_points:    Vec<FeaturePoint>,
     pub image_information: ImageInformation,
@@ -152,22 +159,38 @@ pub enum ImageDataType {
 
 impl<'a> DecodeIso19794<'a> for BiometricFaceData {
     fn decode_iso_19794<R: Reader<'a>>(reader: &mut R) -> der::Result<Self> {
-        let general_header = GeneralHeader::decode_iso_19794(reader)?;
-        let mut representations =
-            Vec::with_capacity(general_header.number_of_representations.into());
-        for _ in 0..general_header.number_of_representations {
-            let representation = FaceRepresentation::decode_iso_19794(reader)?;
-            representations.push(representation);
-        }
+        let header = FaceGeneralHeader::decode_iso_19794(reader)?;
+        let records = (0..header.records_count)
+            .map(|_| FaceRecord::decode_iso_19794(reader))
+            .collect::<Result<_, _>>()?;
 
-        Ok(Self {
-            general_header,
-            representations,
+        Ok(Self { header, records })
+    }
+}
+
+impl<'a> DecodeIso19794<'a> for FaceGeneralHeader {
+    fn decode_iso_19794<R: Reader<'a>>(reader: &mut R) -> Result<Self, Error> {
+        ensure_err!(
+            reader.remaining_len() >= 14u8.into(),
+            Error::incomplete(reader.remaining_len())
+        );
+
+        let format_identifier = FormatIdentifier::decode_iso_19794(reader)?;
+        let version_number = VersionNumber::decode_iso_19794(reader)?;
+
+        let records_length = u32::decode_iso_19794(reader)?;
+        let records_count = u16::decode_iso_19794(reader)?;
+
+        Ok(FaceGeneralHeader {
+            format_identifier,
+            version_number,
+            records_length,
+            records_count,
         })
     }
 }
 
-impl<'a> DecodeIso19794<'a> for FaceRepresentation {
+impl<'a> DecodeIso19794<'a> for FaceRecord {
     fn decode_iso_19794<R: Reader<'a>>(reader: &mut R) -> der::Result<Self> {
         // Header
         let face_information = FacialInformation::decode_iso_19794(reader)?; // 20 bytes
